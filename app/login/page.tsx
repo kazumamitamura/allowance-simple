@@ -146,6 +146,18 @@ export default function LoginPage() {
                 <span>{isSignUp ? '新規登録してログイン' : 'ログイン'}</span>
               )}
             </button>
+
+            {/* パスワードを忘れた方（ログイン時のみ表示） */}
+            {!isSignUp && (
+              <div className="text-center mt-3">
+                <a
+                  href="/forgot-password"
+                  className="text-sm text-blue-600 hover:text-blue-700 font-bold underline"
+                >
+                  パスワードを忘れた方はこちら
+                </a>
+              </div>
+            )}
           </form>
 
           {/* 補足情報 */}
