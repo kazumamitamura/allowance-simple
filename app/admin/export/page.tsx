@@ -40,7 +40,7 @@ export default function ExportPage() {
     setUsers(data || [])
   }
 
-  // 個人月次レポート
+  // 個人月次レポート（帳票形式）
   const exportIndividualMonthly = async () => {
     if (!selectedUser) {
       alert('職員を選択してください')
@@ -57,7 +57,7 @@ export default function ExportPage() {
       .eq('user_id', selectedUser)
       .gte('date', `${yearMonth}-01`)
       .lte('date', `${yearMonth}-31`)
-      .order('date')
+      .order('date', { ascending: true })
 
     const user = users.find(u => u.email === selectedUser)
     
@@ -66,50 +66,81 @@ export default function ExportPage() {
     const campDays = allowances?.filter(a => a.activity_type.includes('合宿')).length || 0
     const expeditionDays = allowances?.filter(a => a.activity_type.includes('遠征')).length || 0
     
-    // ヘッダー情報（1〜4行目）
-    const headerData = [
-      { 'A': '手当明細書' },
-      { 'A': `氏名: ${user?.full_name || selectedUser}` },
-      { 'A': `合計金額: ¥${total.toLocaleString()}`, 'B': `合宿合計日数: ${campDays}日`, 'C': `遠征合計日数: ${expeditionDays}日` },
-      {}  // 空行
+    // 【帳票レイアウト】1〜3行目: 重要サマリーエリア
+    const ws: any = {}
+    
+    // 1行目: 氏名と支給合計額
+    ws['A1'] = { t: 's', v: '氏名' }
+    ws['B1'] = { t: 's', v: `${user?.full_name || selectedUser} 様` }
+    ws['C1'] = { t: 's', v: '支給合計額' }
+    ws['D1'] = { t: 's', v: `¥${total.toLocaleString()}` }
+    
+    // 2行目: 対象月と合宿/遠征計
+    ws['A2'] = { t: 's', v: '対象月' }
+    ws['B2'] = { t: 's', v: `${selectedYear}年${selectedMonth}月` }
+    ws['C2'] = { t: 's', v: '合宿/遠征計' }
+    ws['D2'] = { t: 's', v: `合宿: ${campDays}日 / 遠征: ${expeditionDays}日` }
+    
+    // 3行目: 空行（データなし）
+    
+    // 4行目: 空行
+    
+    // 5行目: 明細ヘッダー
+    ws['A5'] = { t: 's', v: '日付' }
+    ws['B5'] = { t: 's', v: '手当区分' }
+    ws['C5'] = { t: 's', v: '業務内容/備考' }
+    ws['D5'] = { t: 's', v: '単価' }
+    ws['E5'] = { t: 's', v: '金額' }
+    
+    // 6行目以降: 明細データ
+    let rowIndex = 6
+    allowances?.forEach((item) => {
+      ws[`A${rowIndex}`] = { t: 's', v: item.date }
+      ws[`B${rowIndex}`] = { t: 's', v: item.activity_type }
+      
+      // 業務内容/備考（詳細、運転、宿泊を結合）
+      const remarks = []
+      if (item.destination_detail) remarks.push(item.destination_detail)
+      if (item.is_driving) remarks.push('運転')
+      if (item.is_accommodation) remarks.push('宿泊')
+      ws[`C${rowIndex}`] = { t: 's', v: remarks.join(' / ') || '-' }
+      
+      ws[`D${rowIndex}`] = { t: 'n', v: item.amount }
+      ws[`E${rowIndex}`] = { t: 'n', v: item.amount }
+      rowIndex++
+    })
+    
+    // 合計行
+    ws[`A${rowIndex}`] = { t: 's', v: '合計' }
+    ws[`B${rowIndex}`] = { t: 's', v: '' }
+    ws[`C${rowIndex}`] = { t: 's', v: '' }
+    ws[`D${rowIndex}`] = { t: 's', v: '' }
+    ws[`E${rowIndex}`] = { t: 'n', v: total }
+    
+    // シート範囲設定
+    ws['!ref'] = `A1:E${rowIndex}`
+    
+    // 列幅設定（見やすく）
+    ws['!cols'] = [
+      { wch: 12 },  // A: 日付
+      { wch: 25 },  // B: 手当区分
+      { wch: 30 },  // C: 業務内容/備考
+      { wch: 12 },  // D: 単価
+      { wch: 12 }   // E: 金額
     ]
     
-    // Excel用データ整形
-    const excelData = allowances?.map(item => ({
-      '日付': item.date,
-      '業務内容': item.activity_type,
-      '区分': item.destination_type,
-      '詳細': item.destination_detail || '',
-      '運転': item.is_driving ? '○' : '',
-      '宿泊': item.is_accommodation ? '○' : '',
-      '金額': item.amount
-    })) || []
-
-    // 合計行
-    excelData.push({
-      '日付': '合計',
-      '業務内容': '',
-      '区分': '',
-      '詳細': '',
-      '運転': '',
-      '宿泊': '',
-      '金額': total
-    })
-
-    // Excelファイル生成（ヘッダー情報を含む）
-    const ws = XLSX.utils.json_to_sheet(headerData, { skipHeader: true })
-    XLSX.utils.sheet_add_json(ws, excelData, { origin: 'A5' })
-    
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, '手当明細')
+    XLSX.utils.book_append_sheet(wb, ws, '手当申請書')
     
-    XLSX.writeFile(wb, `手当明細_${user?.full_name || selectedUser}_${yearMonth}.xlsx`)
+    // ファイル名: YYYY-MM_手当申請書_[氏名].xlsx
+    const fileName = `${yearMonth}_手当申請書_${user?.full_name || selectedUser}.xlsx`
+    XLSX.writeFile(wb, fileName)
     
     setLoading(false)
-    alert('ダウンロードしました！')
+    alert('✅ ダウンロードしました！\n\n帳票形式で出力されています。')
   }
 
-  // 個人年次レポート
+  // 個人年次レポート（帳票形式）
   const exportIndividualYearly = async () => {
     if (!selectedUser) {
       alert('職員を選択してください')
@@ -125,7 +156,7 @@ export default function ExportPage() {
       .eq('user_id', selectedUser)
       .gte('date', `${selectedYear}-01-01`)
       .lte('date', `${selectedYear}-12-31`)
-      .order('date')
+      .order('date', { ascending: true })
 
     const user = users.find(u => u.email === selectedUser)
     
@@ -141,42 +172,65 @@ export default function ExportPage() {
     const campDays = allowances?.filter(a => a.activity_type.includes('合宿')).length || 0
     const expeditionDays = allowances?.filter(a => a.activity_type.includes('遠征')).length || 0
 
-    // ヘッダー情報（1〜4行目）
-    const headerData = [
-      { 'A': '手当年間集計' },
-      { 'A': `氏名: ${user?.full_name || selectedUser}` },
-      { 'A': `合計金額: ¥${total.toLocaleString()}`, 'B': `合宿合計日数: ${campDays}日`, 'C': `遠征合計日数: ${expeditionDays}日` },
-      {}  // 空行
-    ]
-
-    // Excel用データ整形
-    const excelData = Array.from({ length: 12 }, (_, i) => ({
-      '月': `${i + 1}月`,
-      '件数': allowances?.filter(a => parseInt(a.date.split('-')[1]) === i + 1).length || 0,
-      '金額': monthlyTotals[i + 1] || 0
-    }))
-
+    // 【帳票レイアウト】1〜3行目: 重要サマリーエリア
+    const ws: any = {}
+    
+    // 1行目: 氏名と支給合計額
+    ws['A1'] = { t: 's', v: '氏名' }
+    ws['B1'] = { t: 's', v: `${user?.full_name || selectedUser} 様` }
+    ws['C1'] = { t: 's', v: '年間支給合計額' }
+    ws['D1'] = { t: 's', v: `¥${total.toLocaleString()}` }
+    
+    // 2行目: 対象年と合宿/遠征計
+    ws['A2'] = { t: 's', v: '対象年' }
+    ws['B2'] = { t: 's', v: `${selectedYear}年` }
+    ws['C2'] = { t: 's', v: '合宿/遠征計' }
+    ws['D2'] = { t: 's', v: `合宿: ${campDays}日 / 遠征: ${expeditionDays}日` }
+    
+    // 5行目: 明細ヘッダー
+    ws['A5'] = { t: 's', v: '月' }
+    ws['B5'] = { t: 's', v: '件数' }
+    ws['C5'] = { t: 's', v: '金額' }
+    
+    // 6行目以降: 月別データ
+    let rowIndex = 6
+    for (let i = 0; i < 12; i++) {
+      const month = i + 1
+      const count = allowances?.filter(a => parseInt(a.date.split('-')[1]) === month).length || 0
+      ws[`A${rowIndex}`] = { t: 's', v: `${month}月` }
+      ws[`B${rowIndex}`] = { t: 'n', v: count }
+      ws[`C${rowIndex}`] = { t: 'n', v: monthlyTotals[month] || 0 }
+      rowIndex++
+    }
+    
     // 合計行
-    excelData.push({
-      '月': '年間合計',
-      '件数': allowances?.length || 0,
-      '金額': total
-    })
-
-    // Excelファイル生成（ヘッダー情報を含む）
-    const ws = XLSX.utils.json_to_sheet(headerData, { skipHeader: true })
-    XLSX.utils.sheet_add_json(ws, excelData, { origin: 'A5' })
+    ws[`A${rowIndex}`] = { t: 's', v: '年間合計' }
+    ws[`B${rowIndex}`] = { t: 'n', v: allowances?.length || 0 }
+    ws[`C${rowIndex}`] = { t: 'n', v: total }
+    
+    // シート範囲設定
+    ws['!ref'] = `A1:D${rowIndex}`
+    
+    // 列幅設定
+    ws['!cols'] = [
+      { wch: 12 },  // A: 月
+      { wch: 12 },  // B: 件数
+      { wch: 15 },  // C: 金額
+      { wch: 20 }   // D: (サマリー用)
+    ]
     
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '年間集計')
     
-    XLSX.writeFile(wb, `手当年間集計_${user?.full_name || selectedUser}_${selectedYear}.xlsx`)
+    // ファイル名: YYYY_手当年間集計_[氏名].xlsx
+    const fileName = `${selectedYear}_手当年間集計_${user?.full_name || selectedUser}.xlsx`
+    XLSX.writeFile(wb, fileName)
     
     setLoading(false)
-    alert('ダウンロードしました！')
+    alert('✅ ダウンロードしました！\n\n帳票形式で出力されています。')
   }
 
-  // 全体月次レポート
+  // 全体月次レポート（帳票形式）
   const exportAllMonthly = async () => {
     setLoading(true)
     const yearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
@@ -208,52 +262,74 @@ export default function ExportPage() {
       if (item.activity_type.includes('遠征')) userTotals[item.user_email].expedition++
     })
 
-    // Excel用データ整形
-    const excelData = Object.entries(userTotals).map(([email, data]) => ({
-      '職員名': data.name,
-      'メールアドレス': email,
-      '件数': data.count,
-      '金額': data.amount,
-      '合宿日数': data.camp,
-      '遠征日数': data.expedition
-    }))
+    // 合計計算
+    const totalCount = Object.values(userTotals).reduce((sum, data) => sum + data.count, 0)
+    const totalAmount = Object.values(userTotals).reduce((sum, data) => sum + data.amount, 0)
+    const totalCamp = Object.values(userTotals).reduce((sum, data) => sum + data.camp, 0)
+    const totalExpedition = Object.values(userTotals).reduce((sum, data) => sum + data.expedition, 0)
 
-    // 合計行
-    const totalCount = excelData.reduce((sum, row) => sum + row['件数'], 0)
-    const totalAmount = excelData.reduce((sum, row) => sum + row['金額'], 0)
-    const totalCamp = excelData.reduce((sum, row) => sum + row['合宿日数'], 0)
-    const totalExpedition = excelData.reduce((sum, row) => sum + row['遠征日数'], 0)
-    excelData.push({
-      '職員名': '合計',
-      'メールアドレス': '',
-      '件数': totalCount,
-      '金額': totalAmount,
-      '合宿日数': totalCamp,
-      '遠征日数': totalExpedition
+    // 【帳票レイアウト】1〜3行目: 重要サマリーエリア
+    const ws: any = {}
+    
+    // 1行目: タイトルと支給合計額
+    ws['A1'] = { t: 's', v: '手当全体集計（月次）' }
+    ws['C1'] = { t: 's', v: '支給合計額' }
+    ws['D1'] = { t: 's', v: `¥${totalAmount.toLocaleString()}` }
+    
+    // 2行目: 対象月と合宿/遠征計
+    ws['A2'] = { t: 's', v: '対象月' }
+    ws['B2'] = { t: 's', v: `${selectedYear}年${selectedMonth}月` }
+    ws['C2'] = { t: 's', v: '合宿/遠征計' }
+    ws['D2'] = { t: 's', v: `合宿: ${totalCamp}日 / 遠征: ${totalExpedition}日` }
+    
+    // 5行目: 明細ヘッダー
+    ws['A5'] = { t: 's', v: '職員名' }
+    ws['B5'] = { t: 's', v: '件数' }
+    ws['C5'] = { t: 's', v: '金額' }
+    ws['D5'] = { t: 's', v: '合宿日数' }
+    ws['E5'] = { t: 's', v: '遠征日数' }
+    
+    // 6行目以降: 職員別データ
+    let rowIndex = 6
+    Object.entries(userTotals).forEach(([email, data]) => {
+      ws[`A${rowIndex}`] = { t: 's', v: data.name }
+      ws[`B${rowIndex}`] = { t: 'n', v: data.count }
+      ws[`C${rowIndex}`] = { t: 'n', v: data.amount }
+      ws[`D${rowIndex}`] = { t: 'n', v: data.camp }
+      ws[`E${rowIndex}`] = { t: 'n', v: data.expedition }
+      rowIndex++
     })
-
-    // ヘッダー情報（1〜4行目）
-    const headerData = [
-      { 'A': '手当全体集計（月次）' },
-      { 'A': `対象月: ${yearMonth}` },
-      { 'A': `合計金額: ¥${totalAmount.toLocaleString()}`, 'B': `合宿合計日数: ${totalCamp}日`, 'C': `遠征合計日数: ${totalExpedition}日` },
-      {}  // 空行
+    
+    // 合計行
+    ws[`A${rowIndex}`] = { t: 's', v: '合計' }
+    ws[`B${rowIndex}`] = { t: 'n', v: totalCount }
+    ws[`C${rowIndex}`] = { t: 'n', v: totalAmount }
+    ws[`D${rowIndex}`] = { t: 'n', v: totalCamp }
+    ws[`E${rowIndex}`] = { t: 'n', v: totalExpedition }
+    
+    // シート範囲設定
+    ws['!ref'] = `A1:E${rowIndex}`
+    
+    // 列幅設定
+    ws['!cols'] = [
+      { wch: 20 },  // A: 職員名
+      { wch: 10 },  // B: 件数
+      { wch: 15 },  // C: 金額
+      { wch: 12 },  // D: 合宿日数
+      { wch: 12 }   // E: 遠征日数
     ]
-
-    // Excelファイル生成（ヘッダー情報を含む）
-    const ws = XLSX.utils.json_to_sheet(headerData, { skipHeader: true })
-    XLSX.utils.sheet_add_json(ws, excelData, { origin: 'A5' })
     
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '全体集計')
     
-    XLSX.writeFile(wb, `手当全体集計_${yearMonth}.xlsx`)
+    // ファイル名: YYYY-MM_全体集計.xlsx
+    XLSX.writeFile(wb, `${yearMonth}_全体集計.xlsx`)
     
     setLoading(false)
-    alert('ダウンロードしました！')
+    alert('✅ ダウンロードしました！\n\n帳票形式で出力されています。')
   }
 
-  // 全体年次レポート
+  // 全体年次レポート（帳票形式）
   const exportAllYearly = async () => {
     setLoading(true)
     
@@ -284,49 +360,71 @@ export default function ExportPage() {
       if (item.activity_type.includes('遠征')) userTotals[item.user_email].expedition++
     })
 
-    // Excel用データ整形
-    const excelData = Object.entries(userTotals).map(([email, data]) => ({
-      '職員名': data.name,
-      'メールアドレス': email,
-      '件数': data.count,
-      '金額': data.amount,
-      '合宿日数': data.camp,
-      '遠征日数': data.expedition
-    }))
+    // 合計計算
+    const totalCount = Object.values(userTotals).reduce((sum, data) => sum + data.count, 0)
+    const totalAmount = Object.values(userTotals).reduce((sum, data) => sum + data.amount, 0)
+    const totalCamp = Object.values(userTotals).reduce((sum, data) => sum + data.camp, 0)
+    const totalExpedition = Object.values(userTotals).reduce((sum, data) => sum + data.expedition, 0)
 
-    // 合計行
-    const totalCount = excelData.reduce((sum, row) => sum + row['件数'], 0)
-    const totalAmount = excelData.reduce((sum, row) => sum + row['金額'], 0)
-    const totalCamp = excelData.reduce((sum, row) => sum + row['合宿日数'], 0)
-    const totalExpedition = excelData.reduce((sum, row) => sum + row['遠征日数'], 0)
-    excelData.push({
-      '職員名': '合計',
-      'メールアドレス': '',
-      '件数': totalCount,
-      '金額': totalAmount,
-      '合宿日数': totalCamp,
-      '遠征日数': totalExpedition
+    // 【帳票レイアウト】1〜3行目: 重要サマリーエリア
+    const ws: any = {}
+    
+    // 1行目: タイトルと支給合計額
+    ws['A1'] = { t: 's', v: '手当年間全体集計' }
+    ws['C1'] = { t: 's', v: '年間支給合計額' }
+    ws['D1'] = { t: 's', v: `¥${totalAmount.toLocaleString()}` }
+    
+    // 2行目: 対象年と合宿/遠征計
+    ws['A2'] = { t: 's', v: '対象年' }
+    ws['B2'] = { t: 's', v: `${selectedYear}年` }
+    ws['C2'] = { t: 's', v: '合宿/遠征計' }
+    ws['D2'] = { t: 's', v: `合宿: ${totalCamp}日 / 遠征: ${totalExpedition}日` }
+    
+    // 5行目: 明細ヘッダー
+    ws['A5'] = { t: 's', v: '職員名' }
+    ws['B5'] = { t: 's', v: '件数' }
+    ws['C5'] = { t: 's', v: '金額' }
+    ws['D5'] = { t: 's', v: '合宿日数' }
+    ws['E5'] = { t: 's', v: '遠征日数' }
+    
+    // 6行目以降: 職員別データ
+    let rowIndex = 6
+    Object.entries(userTotals).forEach(([email, data]) => {
+      ws[`A${rowIndex}`] = { t: 's', v: data.name }
+      ws[`B${rowIndex}`] = { t: 'n', v: data.count }
+      ws[`C${rowIndex}`] = { t: 'n', v: data.amount }
+      ws[`D${rowIndex}`] = { t: 'n', v: data.camp }
+      ws[`E${rowIndex}`] = { t: 'n', v: data.expedition }
+      rowIndex++
     })
-
-    // ヘッダー情報（1〜4行目）
-    const headerData = [
-      { 'A': '手当年間全体集計' },
-      { 'A': `対象年: ${selectedYear}年` },
-      { 'A': `合計金額: ¥${totalAmount.toLocaleString()}`, 'B': `合宿合計日数: ${totalCamp}日`, 'C': `遠征合計日数: ${totalExpedition}日` },
-      {}  // 空行
+    
+    // 合計行
+    ws[`A${rowIndex}`] = { t: 's', v: '合計' }
+    ws[`B${rowIndex}`] = { t: 'n', v: totalCount }
+    ws[`C${rowIndex}`] = { t: 'n', v: totalAmount }
+    ws[`D${rowIndex}`] = { t: 'n', v: totalCamp }
+    ws[`E${rowIndex}`] = { t: 'n', v: totalExpedition }
+    
+    // シート範囲設定
+    ws['!ref'] = `A1:E${rowIndex}`
+    
+    // 列幅設定
+    ws['!cols'] = [
+      { wch: 20 },  // A: 職員名
+      { wch: 10 },  // B: 件数
+      { wch: 15 },  // C: 金額
+      { wch: 12 },  // D: 合宿日数
+      { wch: 12 }   // E: 遠征日数
     ]
-
-    // Excelファイル生成（ヘッダー情報を含む）
-    const ws = XLSX.utils.json_to_sheet(headerData, { skipHeader: true })
-    XLSX.utils.sheet_add_json(ws, excelData, { origin: 'A5' })
     
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '年間全体集計')
     
-    XLSX.writeFile(wb, `手当年間全体集計_${selectedYear}.xlsx`)
+    // ファイル名: YYYY_年間全体集計.xlsx
+    XLSX.writeFile(wb, `${selectedYear}_年間全体集計.xlsx`)
     
     setLoading(false)
-    alert('ダウンロードしました！')
+    alert('✅ ダウンロードしました！\n\n帳票形式で出力されています。')
   }
 
   if (!isAdmin) return <div className="p-10 text-center">確認中...</div>
@@ -345,6 +443,15 @@ export default function ExportPage() {
 
       <div className="max-w-6xl mx-auto p-6">
         
+        {/* 重要なお知らせ */}
+        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded-md">
+          <p className="text-sm text-blue-800">
+            <strong>📊 帳票形式で出力されます</strong><br />
+            ※出力されるExcelには、氏名・合計金額・合宿/遠征日数がヘッダーに自動で記載されます。<br />
+            ※経理担当者がそのまま確認・決済に使用できる帳票レイアウトです。
+          </p>
+        </div>
+
         {/* 出力条件設定 */}
         <div className="bg-white p-6 rounded-2xl shadow-md mb-6">
           <h2 className="text-xl font-bold text-slate-800 mb-4">出力条件</h2>

@@ -43,18 +43,29 @@ export default function AllowanceSettingsPage() {
 
   const fetchAllowanceTypes = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('allowance_types')
-      .select('*')
-      .order('code')
-    
-    if (error) {
-      console.error('手当設定取得エラー:', error)
-      alert('手当設定の取得に失敗しました')
-    } else {
-      setAllowanceTypes(data || [])
+    try {
+      const { data, error } = await supabase
+        .from('allowance_types')
+        .select('*')
+        .order('code', { ascending: true })
+      
+      if (error) {
+        console.error('手当設定取得エラー:', error)
+        alert(`⚠️ データの取得に失敗しました\n\nエラー: ${error.message}`)
+        setAllowanceTypes([])
+      } else {
+        setAllowanceTypes(data || [])
+        if (!data || data.length === 0) {
+          console.warn('手当設定データが0件です')
+        }
+      }
+    } catch (err) {
+      console.error('予期しないエラー:', err)
+      alert('⚠️ データの取得中に予期しないエラーが発生しました')
+      setAllowanceTypes([])
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const startEdit = (type: AllowanceType) => {
@@ -69,29 +80,35 @@ export default function AllowanceSettingsPage() {
 
   const saveEdit = async (id: number) => {
     if (!editForm.display_name || editForm.base_amount < 0) {
-      alert('表示名と金額を正しく入力してください')
+      alert('⚠️ 表示名と金額を正しく入力してください')
       return
     }
 
     setLoading(true)
-    const { error } = await supabase
-      .from('allowance_types')
-      .update({
-        display_name: editForm.display_name,
-        base_amount: editForm.base_amount,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
+    try {
+      const { error } = await supabase
+        .from('allowance_types')
+        .update({
+          display_name: editForm.display_name,
+          base_amount: editForm.base_amount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
 
-    if (error) {
-      console.error('更新エラー:', error)
-      alert('更新に失敗しました')
-    } else {
-      alert('✅ 更新しました')
-      fetchAllowanceTypes()
-      cancelEdit()
+      if (error) {
+        console.error('更新エラー:', error)
+        alert(`⚠️ 更新に失敗しました\n\nエラー: ${error.message}`)
+      } else {
+        alert('✅ 更新しました')
+        fetchAllowanceTypes()
+        cancelEdit()
+      }
+    } catch (err) {
+      console.error('予期しないエラー:', err)
+      alert('⚠️ 更新中に予期しないエラーが発生しました')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const handleLogout = async () => {
