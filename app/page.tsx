@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Calendar from 'react-calendar'
 import 'react-calendar/dist/Calendar.css'
 import { ACTIVITY_TYPES, DESTINATIONS, calculateAmount, canSelectActivity } from '@/utils/allowanceRules'
+import { logout } from './auth/actions'
 
 const ADMIN_EMAILS = ['mitamuraka@haguroko.ed.jp', 'tomonoem@haguroko.ed.jp'].map(e => e.toLowerCase())
 
@@ -251,7 +252,9 @@ export default function Home() {
     }
   }
 
-  const handleLogout = async () => { await supabase.auth.signOut(); router.push('/login') }
+  const handleLogout = async () => { 
+    await logout()
+  }
   const handlePrevMonth = () => { const d = new Date(selectedDate); d.setMonth(d.getMonth() - 1); setSelectedDate(d) }
   const handleNextMonth = () => { const d = new Date(selectedDate); d.setMonth(d.getMonth() + 1); setSelectedDate(d) }
   const calculateMonthTotal = () => { 

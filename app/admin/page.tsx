@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { isAdmin as checkIsAdmin, getUserRoles } from '@/utils/adminRoles'
+import { logout } from '../auth/actions'
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -58,8 +59,7 @@ export default function AdminDashboard() {
   }
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
+    await logout()
   }
 
   const handleCsvUpload = async () => {
