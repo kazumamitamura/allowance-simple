@@ -22,8 +22,8 @@ export default function AllowanceSettingsPage() {
   const router = useRouter()
   const supabase = createClient()
   
-  const [loading, setLoading] = useState(false)
-  const [allowanceTypes, setAllowanceTypes] = useState<AllowanceType[]>([])
+  const [loading, setLoading] = useState(true)  // 初期値をtrueに設定（初回読み込み表示）
+  const [allowanceTypes, setAllowanceTypes] = useState<AllowanceType[]>([])  // 空配列で初期化
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState({ display_name: '', base_amount: 0 })
 
@@ -155,20 +155,38 @@ export default function AllowanceSettingsPage() {
               </thead>
               <tbody>
                 {loading && (
+                  <>
+                    {/* Skeleton Loading */}
+                    {Array.from({ length: 5 }).map((_, idx) => (
+                      <tr key={`skeleton-${idx}`} className="border-b border-gray-200 animate-pulse">
+                        <td className="px-6 py-4">
+                          <div className="h-4 bg-gray-200 rounded w-16"></div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="h-4 bg-gray-200 rounded w-48"></div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="h-4 bg-gray-200 rounded w-24 ml-auto"></div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="h-6 bg-gray-200 rounded-full w-20 mx-auto"></div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="h-10 bg-gray-200 rounded w-16 mx-auto"></div>
+                        </td>
+                      </tr>
+                    ))}
+                  </>
+                )}
+                {!loading && (!allowanceTypes || allowanceTypes.length === 0) && (
                   <tr>
                     <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                      読み込み中...
+                      手当設定がありません。<br />
+                      <span className="text-xs">Supabaseで allowance_types テーブルにデータを追加してください。</span>
                     </td>
                   </tr>
                 )}
-                {!loading && allowanceTypes.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                      手当設定がありません
-                    </td>
-                  </tr>
-                )}
-                {!loading && allowanceTypes.map((type) => (
+                {!loading && allowanceTypes?.map((type) => (
                   <tr key={type.id} className="border-b border-gray-200 hover:bg-gray-50 transition">
                     <td className="px-6 py-4 font-mono font-bold text-blue-700">{type.code}</td>
                     <td className="px-6 py-4">
