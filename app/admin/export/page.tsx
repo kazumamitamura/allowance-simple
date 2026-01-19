@@ -64,55 +64,53 @@ export default function ExportPage() {
     
     // 合計計算
     const total = allowances?.reduce((sum, item) => sum + item.amount, 0) || 0
-    const campDays = allowances?.filter(a => a.activity_type.includes('合宿')).length || 0
-    const expeditionDays = allowances?.filter(a => a.activity_type.includes('遠征')).length || 0
+    const campCount = allowances?.filter(a => a.activity_type.includes('合宿')).length || 0
+    const expeditionCount = allowances?.filter(a => a.activity_type.includes('遠征')).length || 0
+    
+    // 曜日を取得するヘルパー関数
+    const getDayOfWeek = (dateStr: string) => {
+      const days = ['日', '月', '火', '水', '木', '金', '土']
+      const date = new Date(dateStr)
+      return days[date.getDay()]
+    }
     
     // 【aoa_to_sheet を使用した帳票レイアウト】
     
-    // 1行目: サマリー1
-    const row1 = ['氏名', `${userName} 様`, '支給合計額', total]  // 金額は数値型
+    // 1行目: サマリー1（氏名と支給合計額）
+    const headerRows = [
+      ['氏名', `${userName} 様`, '支給合計額', total],  // B列に氏名、D列に金額（数値型）
+      ['対象月', `${selectedYear}年${selectedMonth}月`, '活動内訳', `合宿:${campCount}日 / 遠征:${expeditionCount}日`],  // 2行目
+      [],  // 3行目: 空行（見やすくするため）
+      ['日付', '曜日', '手当区分', '業務内容', '宿泊', '運転', '金額']  // 4行目: テーブルヘッダー
+    ]
     
-    // 2行目: サマリー2
-    const row2 = ['対象月', `${selectedYear}年${selectedMonth}月`, '内訳日数', `合宿: ${campDays}日 / 遠征: ${expeditionDays}日`]
-    
-    // 3行目: 空行
-    const row3: any[] = []
-    
-    // 4行目: 明細ヘッダー
-    const row4 = ['日付', '手当区分', '業務内容/備考', '宿泊', '運転', '金額']
-    
-    // 5行目以降: データ行
-    const dataRows = allowances?.map((item) => {
-      // 業務内容/備考
-      const remarks = item.destination_detail || '-'
-      
-      return [
-        item.date,
-        item.activity_type,
-        remarks,
-        item.is_accommodation ? '○' : '',
-        item.is_driving ? '○' : '',
-        item.amount  // 金額は数値型
-      ]
-    }) || []
+    // 5行目以降: 明細データ（ボディ部分）
+    const bodyRows = allowances?.map(record => [
+      record.date,                        // A列: 日付
+      getDayOfWeek(record.date),          // B列: 曜日
+      record.activity_type,               // C列: 手当区分
+      record.destination_detail || '-',   // D列: 業務内容
+      record.is_accommodation ? '○' : '', // E列: 宿泊
+      record.is_driving ? '○' : '',       // F列: 運転
+      record.amount                       // G列: 金額（数値型で出力）
+    ]) || []
     
     // 合計行
-    const totalRow = ['合計', '', '', '', '', total]  // 金額は数値型
+    const totalRow = ['合計', '', '', '', '', '', total]  // G列に合計金額
     
-    // 全行を結合
-    const allRows = [row1, row2, row3, row4, ...dataRows, totalRow]
-    
-    // aoa_to_sheet でワークシート作成
+    // 結合してシート化
+    const allRows = [...headerRows, ...bodyRows, totalRow]
     const ws = XLSX.utils.aoa_to_sheet(allRows)
     
-    // 列幅設定
+    // 列幅の調整（見切れ防止）
     ws['!cols'] = [
       { wch: 12 },  // A: 日付
-      { wch: 25 },  // B: 手当区分
-      { wch: 30 },  // C: 業務内容/備考
-      { wch: 8 },   // D: 宿泊
-      { wch: 8 },   // E: 運転
-      { wch: 12 }   // F: 金額
+      { wch: 5 },   // B: 曜日
+      { wch: 25 },  // C: 手当区分
+      { wch: 30 },  // D: 業務内容
+      { wch: 5 },   // E: 宿泊
+      { wch: 5 },   // F: 運転
+      { wch: 10 }   // G: 金額
     ]
     
     const wb = XLSX.utils.book_new()
@@ -123,7 +121,7 @@ export default function ExportPage() {
     XLSX.writeFile(wb, fileName)
     
     setLoading(false)
-    alert('✅ ダウンロードしました！\n\n帳票形式で出力されています。')
+    alert('✅ ダウンロードしました！\n\n帳票形式（氏名・サマリー付き）で出力されています。')
   }
 
   // 個人年次レポート（帳票形式 - aoa_to_sheet使用）
@@ -156,41 +154,35 @@ export default function ExportPage() {
 
     // 合計計算
     const total = Object.values(monthlyTotals).reduce((sum, val) => sum + val, 0)
-    const campDays = allowances?.filter(a => a.activity_type.includes('合宿')).length || 0
-    const expeditionDays = allowances?.filter(a => a.activity_type.includes('遠征')).length || 0
+    const campCount = allowances?.filter(a => a.activity_type.includes('合宿')).length || 0
+    const expeditionCount = allowances?.filter(a => a.activity_type.includes('遠征')).length || 0
 
     // 【aoa_to_sheet を使用した帳票レイアウト】
     
-    // 1行目: サマリー1
-    const row1 = ['氏名', `${userName} 様`, '年間支給合計額', total]  // 金額は数値型
-    
-    // 2行目: サマリー2
-    const row2 = ['対象年', `${selectedYear}年`, '内訳日数', `合宿: ${campDays}日 / 遠征: ${expeditionDays}日`]
-    
-    // 3行目: 空行
-    const row3: any[] = []
-    
-    // 4行目: 明細ヘッダー
-    const row4 = ['月', '件数', '金額']
+    // 1行目: サマリー1（氏名と支給合計額）
+    const headerRows = [
+      ['氏名', `${userName} 様`, '年間支給合計額', total],  // B列に氏名、D列に金額（数値型）
+      ['対象年', `${selectedYear}年`, '活動内訳', `合宿:${campCount}日 / 遠征:${expeditionCount}日`],  // 2行目
+      [],  // 3行目: 空行
+      ['月', '件数', '金額']  // 4行目: テーブルヘッダー
+    ]
     
     // 5行目以降: 月別データ
-    const dataRows = Array.from({ length: 12 }, (_, i) => {
+    const bodyRows = Array.from({ length: 12 }, (_, i) => {
       const month = i + 1
       const count = allowances?.filter(a => parseInt(a.date.split('-')[1]) === month).length || 0
       return [
-        `${month}月`,
-        count,  // 件数は数値型
-        monthlyTotals[month] || 0  // 金額は数値型
+        `${month}月`,                // A列: 月
+        count,                       // B列: 件数（数値型）
+        monthlyTotals[month] || 0    // C列: 金額（数値型）
       ]
     })
     
     // 合計行
     const totalRow = ['年間合計', allowances?.length || 0, total]  // 件数と金額は数値型
     
-    // 全行を結合
-    const allRows = [row1, row2, row3, row4, ...dataRows, totalRow]
-    
-    // aoa_to_sheet でワークシート作成
+    // 結合してシート化
+    const allRows = [...headerRows, ...bodyRows, totalRow]
     const ws = XLSX.utils.aoa_to_sheet(allRows)
     
     // 列幅設定
@@ -208,7 +200,7 @@ export default function ExportPage() {
     XLSX.writeFile(wb, fileName)
     
     setLoading(false)
-    alert('✅ ダウンロードしました！\n\n帳票形式で出力されています。')
+    alert('✅ ダウンロードしました！\n\n帳票形式（氏名・サマリー付き）で出力されています。')
   }
 
   // 全体月次レポート（帳票形式 - aoa_to_sheet使用）
@@ -251,34 +243,28 @@ export default function ExportPage() {
 
     // 【aoa_to_sheet を使用した帳票レイアウト】
     
-    // 1行目: サマリー1
-    const row1 = ['手当全体集計（月次）', '', '支給合計額', totalAmount]  // 金額は数値型
-    
-    // 2行目: サマリー2
-    const row2 = ['対象月', `${selectedYear}年${selectedMonth}月`, '内訳日数', `合宿: ${totalCamp}日 / 遠征: ${totalExpedition}日`]
-    
-    // 3行目: 空行
-    const row3: any[] = []
-    
-    // 4行目: 明細ヘッダー
-    const row4 = ['職員名', '件数', '金額', '合宿日数', '遠征日数']
+    // 1行目: サマリー1（タイトルと支給合計額）
+    const headerRows = [
+      ['手当全体集計（月次）', '', '支給合計額', totalAmount],  // D列に金額（数値型）
+      ['対象月', `${selectedYear}年${selectedMonth}月`, '活動内訳', `合宿:${totalCamp}日 / 遠征:${totalExpedition}日`],  // 2行目
+      [],  // 3行目: 空行
+      ['職員名', '件数', '金額', '合宿日数', '遠征日数']  // 4行目: テーブルヘッダー
+    ]
     
     // 5行目以降: 職員別データ
-    const dataRows = Object.entries(userTotals).map(([email, data]) => [
-      data.name,
-      data.count,      // 数値型
-      data.amount,     // 数値型
-      data.camp,       // 数値型
-      data.expedition  // 数値型
+    const bodyRows = Object.entries(userTotals).map(([email, data]) => [
+      data.name,       // A列: 職員名
+      data.count,      // B列: 件数（数値型）
+      data.amount,     // C列: 金額（数値型）
+      data.camp,       // D列: 合宿日数（数値型）
+      data.expedition  // E列: 遠征日数（数値型）
     ])
     
     // 合計行
     const totalRow = ['合計', totalCount, totalAmount, totalCamp, totalExpedition]  // すべて数値型
     
-    // 全行を結合
-    const allRows = [row1, row2, row3, row4, ...dataRows, totalRow]
-    
-    // aoa_to_sheet でワークシート作成
+    // 結合してシート化
+    const allRows = [...headerRows, ...bodyRows, totalRow]
     const ws = XLSX.utils.aoa_to_sheet(allRows)
     
     // 列幅設定
@@ -297,7 +283,7 @@ export default function ExportPage() {
     XLSX.writeFile(wb, `${yearMonth}_全体集計.xlsx`)
     
     setLoading(false)
-    alert('✅ ダウンロードしました！\n\n帳票形式で出力されています。')
+    alert('✅ ダウンロードしました！\n\n帳票形式（サマリー付き）で出力されています。')
   }
 
   // 全体年次レポート（帳票形式 - aoa_to_sheet使用）
@@ -339,34 +325,28 @@ export default function ExportPage() {
 
     // 【aoa_to_sheet を使用した帳票レイアウト】
     
-    // 1行目: サマリー1
-    const row1 = ['手当年間全体集計', '', '年間支給合計額', totalAmount]  // 金額は数値型
-    
-    // 2行目: サマリー2
-    const row2 = ['対象年', `${selectedYear}年`, '内訳日数', `合宿: ${totalCamp}日 / 遠征: ${totalExpedition}日`]
-    
-    // 3行目: 空行
-    const row3: any[] = []
-    
-    // 4行目: 明細ヘッダー
-    const row4 = ['職員名', '件数', '金額', '合宿日数', '遠征日数']
+    // 1行目: サマリー1（タイトルと支給合計額）
+    const headerRows = [
+      ['手当年間全体集計', '', '年間支給合計額', totalAmount],  // D列に金額（数値型）
+      ['対象年', `${selectedYear}年`, '活動内訳', `合宿:${totalCamp}日 / 遠征:${totalExpedition}日`],  // 2行目
+      [],  // 3行目: 空行
+      ['職員名', '件数', '金額', '合宿日数', '遠征日数']  // 4行目: テーブルヘッダー
+    ]
     
     // 5行目以降: 職員別データ
-    const dataRows = Object.entries(userTotals).map(([email, data]) => [
-      data.name,
-      data.count,      // 数値型
-      data.amount,     // 数値型
-      data.camp,       // 数値型
-      data.expedition  // 数値型
+    const bodyRows = Object.entries(userTotals).map(([email, data]) => [
+      data.name,       // A列: 職員名
+      data.count,      // B列: 件数（数値型）
+      data.amount,     // C列: 金額（数値型）
+      data.camp,       // D列: 合宿日数（数値型）
+      data.expedition  // E列: 遠征日数（数値型）
     ])
     
     // 合計行
     const totalRow = ['合計', totalCount, totalAmount, totalCamp, totalExpedition]  // すべて数値型
     
-    // 全行を結合
-    const allRows = [row1, row2, row3, row4, ...dataRows, totalRow]
-    
-    // aoa_to_sheet でワークシート作成
+    // 結合してシート化
+    const allRows = [...headerRows, ...bodyRows, totalRow]
     const ws = XLSX.utils.aoa_to_sheet(allRows)
     
     // 列幅設定
@@ -385,7 +365,7 @@ export default function ExportPage() {
     XLSX.writeFile(wb, `${selectedYear}_年間全体集計.xlsx`)
     
     setLoading(false)
-    alert('✅ ダウンロードしました！\n\n帳票形式で出力されています。')
+    alert('✅ ダウンロードしました！\n\n帳票形式（サマリー付き）で出力されています。')
   }
 
   if (!isAdmin) return <div className="p-10 text-center">確認中...</div>

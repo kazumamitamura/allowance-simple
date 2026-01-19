@@ -29,16 +29,25 @@ export default function AllowanceSettingsPage() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      if (!ADMIN_EMAILS.includes(user.email?.toLowerCase() || '')) {
-        alert('管理者権限がありません')
-        router.push('/')
-        return
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { 
+          router.push('/login')
+          return 
+        }
+        if (!ADMIN_EMAILS.includes(user.email?.toLowerCase() || '')) {
+          alert('管理者権限がありません')
+          router.push('/')
+          return
+        }
+        await fetchAllowanceTypes()
+      } catch (error) {
+        console.error('認証エラー:', error)
+        setLoading(false)
       }
-      fetchAllowanceTypes()
     }
     checkAuth()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchAllowanceTypes = async () => {
@@ -140,53 +149,39 @@ export default function AllowanceSettingsPage() {
           </p>
         </div>
 
-        {/* 設定一覧テーブル */}
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-blue-600 text-white">
-                <tr>
-                  <th className="px-6 py-4 font-bold">コード</th>
-                  <th className="px-6 py-4 font-bold">表示名</th>
-                  <th className="px-6 py-4 font-bold text-right">基本金額 (円)</th>
-                  <th className="px-6 py-4 font-bold text-center">休日限定</th>
-                  <th className="px-6 py-4 font-bold text-center">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && (
-                  <>
-                    {/* Skeleton Loading */}
-                    {Array.from({ length: 5 }).map((_, idx) => (
-                      <tr key={`skeleton-${idx}`} className="border-b border-gray-200 animate-pulse">
-                        <td className="px-6 py-4">
-                          <div className="h-4 bg-gray-200 rounded w-16"></div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="h-4 bg-gray-200 rounded w-48"></div>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="h-4 bg-gray-200 rounded w-24 ml-auto"></div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="h-6 bg-gray-200 rounded-full w-20 mx-auto"></div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="h-10 bg-gray-200 rounded w-16 mx-auto"></div>
-                        </td>
-                      </tr>
-                    ))}
-                  </>
-                )}
-                {!loading && (!allowanceTypes || allowanceTypes.length === 0) && (
+        {/* ローディング中の表示 */}
+        {loading && (
+          <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 font-bold text-lg">読み込み中...</p>
+            <p className="text-gray-400 text-sm mt-2">手当設定データを取得しています</p>
+          </div>
+        )}
+
+        {/* 設定一覧テーブル（ローディング完了後のみ表示） */}
+        {!loading && (
+          <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-blue-600 text-white">
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                      手当設定がありません。<br />
-                      <span className="text-xs">Supabaseで allowance_types テーブルにデータを追加してください。</span>
-                    </td>
+                    <th className="px-6 py-4 font-bold">コード</th>
+                    <th className="px-6 py-4 font-bold">表示名</th>
+                    <th className="px-6 py-4 font-bold text-right">基本金額 (円)</th>
+                    <th className="px-6 py-4 font-bold text-center">休日限定</th>
+                    <th className="px-6 py-4 font-bold text-center">操作</th>
                   </tr>
-                )}
-                {!loading && allowanceTypes?.map((type) => (
+                </thead>
+                <tbody>
+                  {(!allowanceTypes || allowanceTypes.length === 0) && (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                        手当設定がありません。<br />
+                        <span className="text-xs">Supabaseで allowance_types テーブルにデータを追加してください。</span>
+                      </td>
+                    </tr>
+                  )}
+                  {allowanceTypes && allowanceTypes.length > 0 && allowanceTypes.map((type) => (
                   <tr key={type.id} className="border-b border-gray-200 hover:bg-gray-50 transition">
                     <td className="px-6 py-4 font-mono font-bold text-blue-700">{type.code}</td>
                     <td className="px-6 py-4">
@@ -254,11 +249,12 @@ export default function AllowanceSettingsPage() {
                       )}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* フッター情報 */}
         <div className="mt-6 text-center text-sm text-gray-600">
