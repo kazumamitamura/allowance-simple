@@ -586,3 +586,6 @@ export default function Home() {
     </div>
   )
 }
+
+// Update trigger: 2026-01-19 23:45:00 JST - Force rebuild for Vercel deployment
+// This ensures the page is properly recognized and deployed

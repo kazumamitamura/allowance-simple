@@ -12,9 +12,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata = {
-  title: '特殊勤務手当管理',
-  description: '部活動指導手当などの実績を管理するアプリ',
+export const metadata: Metadata = {
+  title: '手当管理システム | 特殊勤務手当管理',
+  description: '部活動指導手当などの実績を簡単に入力・管理できるシステム',
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({
