@@ -11,6 +11,7 @@ const ADMIN_EMAILS = ['mitamuraka@haguroko.ed.jp', 'tomonoem@haguroko.ed.jp'].ma
 
 type Allowance = { id: number, user_id: string, date: string, activity_type: string, amount: number, destination_type: string, destination_detail: string, is_driving: boolean, is_accommodation: boolean }
 type SchoolCalendar = { date: string, day_type: string }
+type AnnualSchedule = { date: string, work_type: string, event_name: string }
 
 const formatDate = (date: Date) => {
   const y = date.getFullYear()
@@ -30,6 +31,7 @@ export default function Home() {
 
   const [allowances, setAllowances] = useState<Allowance[]>([])
   const [schoolCalendar, setSchoolCalendar] = useState<SchoolCalendar[]>([])
+  const [annualSchedules, setAnnualSchedules] = useState<AnnualSchedule[]>([])
   
   const [allowanceStatus, setAllowanceStatus] = useState<'draft' | 'submitted' | 'approved'>('draft')
   
@@ -54,8 +56,9 @@ export default function Home() {
   const getLockStatus = (targetDate: Date) => {
     if (isAdmin) return false
     const now = new Date()
-    const deadline = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 6, 0, 0, 0)
-    const isPastDeadline = now >= deadline
+    // 翌月10日23:59までは編集可能
+    const deadline = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 10, 23, 59, 59)
+    const isPastDeadline = now > deadline
     const currentViewMonth = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`
     const targetMonth = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`
     const isTargetMonth = currentViewMonth === targetMonth
@@ -77,6 +80,7 @@ export default function Home() {
 
       fetchData(user.id)
       fetchSchoolCalendar()
+      fetchAnnualSchedules()
       fetchApplicationStatus(user.id, selectedDate)
     }
     init()
@@ -122,6 +126,11 @@ export default function Home() {
   const fetchSchoolCalendar = async () => {
     const { data } = await supabase.from('school_calendar').select('*')
     setSchoolCalendar(data || [])
+  }
+
+  const fetchAnnualSchedules = async () => {
+    const { data } = await supabase.from('annual_schedules').select('*')
+    setAnnualSchedules(data || [])
   }
 
   const fetchApplicationStatus = async (uid: string, date: Date) => {
@@ -256,6 +265,11 @@ export default function Home() {
   // カレンダー日付クリック時の処理
   const handleDateClick = (date: Date) => {
     setSelectedDate(date)
+    // ロックチェック
+    if (getLockStatus(date)) {
+      alert('⏰ 締め切り済みのため編集できません\n\n対象月の翌月10日までに入力・編集を完了してください。')
+      return
+    }
     setShowInputModal(true)
   }
 
@@ -263,20 +277,48 @@ export default function Home() {
     if (view !== 'month') return null
     const dateStr = formatDate(date)
     const allowance = allowances.find(i => i.date === dateStr)
+    const schedule = annualSchedules.find(s => s.date === dateStr)
+    
+    // 今日かどうか判定
+    const today = new Date()
+    const isToday = date.getDate() === today.getDate() && 
+                    date.getMonth() === today.getMonth() && 
+                    date.getFullYear() === today.getFullYear()
+
+    // 背景色とボーダーの設定
+    let bgClass = 'bg-gray-50' // 未入力の日（薄いグレー）
+    let borderClass = 'border border-gray-200'
+    
+    if (allowance) {
+      bgClass = 'bg-white' // 入力済みの日（白背景）
+      borderClass = 'border-2 border-gray-300'
+    }
+    
+    if (isToday) {
+      borderClass = 'border-2 border-blue-500' // 今日（青い枠線）
+    }
 
     return ( 
-        <div className="flex flex-col items-start justify-start w-full h-full p-1 rounded-lg">
-            {/* 手当金額のみ表示 */}
-            {allowance && (
-                <div className="mt-1 px-2 py-0.5 bg-blue-100 rounded-md">
-                    <span className="text-xs font-bold text-blue-700">¥{allowance.amount.toLocaleString()}</span>
+        <div className={`flex flex-col items-start justify-start w-full h-full p-2 rounded-lg ${bgClass} ${borderClass} min-h-[60px] relative`}>
+            {/* 勤務区分（右上に小さく表示） */}
+            {schedule && schedule.work_type && (
+                <div className="absolute top-1 right-1 px-1.5 py-0.5 bg-purple-100 border border-purple-300 rounded text-xs font-bold text-purple-700">
+                    {schedule.work_type}
                 </div>
             )}
             
-            {/* 登録済みマーク */}
+            {/* 日付番号（今日は青い丸で強調） */}
+            <div className={`text-xs font-bold mb-1 ${isToday ? 'bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center' : 'text-gray-900'}`}>
+                {date.getDate()}
+            </div>
+            
+            {/* 手当金額（入力済みの場合のみ表示） */}
             {allowance && (
-                <div className="absolute bottom-1 right-1">
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                <div className="w-full">
+                    <div className="px-2 py-1 bg-blue-50 rounded-md border border-blue-200">
+                        <span className="text-xs font-bold text-gray-900">¥{allowance.amount.toLocaleString()}</span>
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1 truncate">{allowance.activity_type}</div>
                 </div>
             )}
         </div> 
@@ -287,6 +329,24 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
        {isAdmin && <div className="bg-slate-800 text-white text-center py-3 text-sm font-bold shadow-md"><a href="/admin" className="underline hover:text-blue-300 transition">事務担当者ページへ</a></div>}
 
+      {/* 氏名未登録バナー */}
+      {!userName && (
+        <div className="bg-yellow-100 border-b-2 border-yellow-400 py-3 px-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-yellow-800 font-bold">⚠️ 氏名が未登録です</span>
+              <span className="text-sm text-yellow-700">帳票出力のため、氏名を登録してください。</span>
+            </div>
+            <button 
+              onClick={() => setShowProfileModal(true)} 
+              className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition"
+            >
+              今すぐ登録
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ヘッダー */}
       <div className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -294,7 +354,7 @@ export default function Home() {
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-3">
                 <button onClick={handlePrevMonth} className="text-slate-400 hover:text-slate-600 p-2 text-2xl font-bold transition">‹</button>
-                <h2 className="text-xl font-bold text-slate-800">{selectedDate.getFullYear()}年 {selectedDate.getMonth() + 1}月</h2>
+                <h2 className="text-xl font-bold text-gray-900">{selectedDate.getFullYear()}年 {selectedDate.getMonth() + 1}月</h2>
                 <button onClick={handleNextMonth} className="text-slate-400 hover:text-slate-600 p-2 text-2xl font-bold transition">›</button>
               </div>
               <div className="text-3xl font-extrabold text-blue-600">¥{calculateMonthTotal().toLocaleString()}</div>
@@ -332,17 +392,17 @@ export default function Home() {
         
         {/* 月次サマリー */}
         <div className="mt-8 bg-white rounded-2xl shadow-lg p-6">
-          <h3 className="font-bold text-slate-700 text-lg mb-4">{selectedDate.getMonth() + 1}月の手当履歴</h3>
+          <h3 className="font-bold text-gray-900 text-lg mb-4">{selectedDate.getMonth() + 1}月の手当履歴</h3>
           <div className="space-y-2">
             {allowances.filter(i => { const d = new Date(i.date); return d.getMonth() === selectedDate.getMonth() && d.getFullYear() === selectedDate.getFullYear() }).map((item) => (
               <div key={item.id} className="bg-slate-50 p-4 rounded-xl flex justify-between items-center border border-slate-100 hover:border-slate-300 transition">
                 <div className="flex items-center gap-4">
-                  <span className="font-bold text-slate-700 text-lg">{item.date.split('-')[2]}日</span>
-                  <span className="text-sm text-slate-500">{item.activity_type}</span>
-                  {item.destination_detail && <span className="text-xs text-slate-400">({item.destination_detail})</span>}
+                  <span className="font-bold text-gray-900 text-lg">{item.date.split('-')[2]}日</span>
+                  <span className="text-sm text-gray-900">{item.activity_type}</span>
+                  {item.destination_detail && <span className="text-xs text-gray-700">({item.destination_detail})</span>}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-bold text-slate-700 text-lg">¥{item.amount.toLocaleString()}</span>
+                  <span className="font-bold text-gray-900 text-lg">¥{item.amount.toLocaleString()}</span>
                   {!isAllowLocked && <button onClick={() => handleDelete(item.id, item.date)} className="text-slate-300 hover:text-red-500 transition text-xl">🗑</button>}
                 </div>
               </div>
@@ -361,7 +421,7 @@ export default function Home() {
             {/* モーダルヘッダー */}
             <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center rounded-t-2xl">
               <div>
-                <h2 className="font-bold text-slate-800 text-lg">{selectedDate.getMonth() + 1}月{selectedDate.getDate()}日 ({['日', '月', '火', '水', '木', '金', '土'][selectedDate.getDay()]}) の手当入力</h2>
+                <h2 className="font-bold text-gray-900 text-lg">{selectedDate.getMonth() + 1}月{selectedDate.getDate()}日 ({['日', '月', '火', '水', '木', '金', '土'][selectedDate.getDay()]}) の手当入力</h2>
                 <div className="flex gap-2 mt-2">
                   {isAllowLocked && <span className="text-xs px-2 py-1 rounded font-bold bg-gray-100 text-gray-500">💰 編集不可</span>}
                   <span className={`text-xs px-2 py-1 rounded font-bold ${dayType.includes('休日') || dayType.includes('週休') ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
@@ -562,7 +622,7 @@ export default function Home() {
       {showProfileModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-sm">
-                  <h3 className="text-lg font-bold text-slate-800 mb-4">氏名登録</h3>
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">氏名登録</h3>
                   <p className="text-xs text-slate-500 mb-4">帳票出力に使用する氏名を登録してください。<br/>自動的に姓と名の間に半角スペースが入ります。</p>
                   
                   <div className="flex gap-2 mb-4">

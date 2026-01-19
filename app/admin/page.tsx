@@ -15,6 +15,8 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({
     pendingAllowances: 0
   })
+  const [csvFile, setCsvFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -58,6 +60,55 @@ export default function AdminDashboard() {
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  const handleCsvUpload = async () => {
+    if (!csvFile) {
+      alert('CSVファイルを選択してください')
+      return
+    }
+
+    setUploading(true)
+    try {
+      const text = await csvFile.text()
+      const lines = text.split('\n').filter(line => line.trim())
+      
+      // ヘッダー行をスキップ
+      const dataLines = lines.slice(1)
+      
+      const records = dataLines.map(line => {
+        const [date, workType, eventName] = line.split(',').map(v => v.trim())
+        return {
+          date,
+          work_type: workType || '',
+          event_name: eventName || ''
+        }
+      }).filter(r => r.date) // 日付がある行のみ
+
+      if (records.length === 0) {
+        alert('有効なデータが見つかりませんでした')
+        setUploading(false)
+        return
+      }
+
+      // Supabaseにupsert
+      const { error } = await supabase
+        .from('annual_schedules')
+        .upsert(records, { onConflict: 'date' })
+
+      if (error) {
+        alert('エラーが発生しました: ' + error.message)
+      } else {
+        alert(`${records.length}件の勤務表データを登録しました！`)
+        setCsvFile(null)
+        // ファイル入力をリセット
+        const fileInput = document.getElementById('csv-file-input') as HTMLInputElement
+        if (fileInput) fileInput.value = ''
+      }
+    } catch (err) {
+      alert('CSVの読み込みに失敗しました: ' + err)
+    }
+    setUploading(false)
   }
 
   if (!isAuthorized) return <div className="p-10 text-center">確認中...</div>
@@ -145,6 +196,54 @@ export default function AdminDashboard() {
               全管理者
             </div>
           </button>
+        </div>
+
+        {/* 年間勤務表CSVアップロード */}
+        <div className="bg-white p-6 rounded-2xl shadow-md mb-8">
+          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <span className="text-2xl">📅</span>
+            年間勤務表CSV登録
+          </h3>
+          <p className="text-sm text-gray-700 mb-4">
+            CSVファイルをアップロードして、年間の勤務区分（A/B/休/祝など）を一括登録できます。<br/>
+            ユーザー画面のカレンダーに勤務区分が表示されます。
+          </p>
+          
+          <div className="bg-gray-50 p-4 rounded-lg mb-4">
+            <h4 className="text-sm font-bold text-gray-900 mb-2">CSVフォーマット例</h4>
+            <pre className="text-xs text-gray-900 bg-white p-3 rounded border border-gray-300 overflow-x-auto">
+日付,勤務区分,行事名
+2025-04-01,A,入学式
+2025-04-02,B,通常授業
+2025-04-29,祝,昭和の日
+2025-05-03,休,憲法記念日
+            </pre>
+          </div>
+
+          <div className="flex gap-4 items-end">
+            <div className="flex-1">
+              <label className="block text-sm font-bold text-gray-900 mb-2">
+                CSVファイルを選択
+              </label>
+              <input
+                id="csv-file-input"
+                type="file"
+                accept=".csv"
+                onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
+                className="w-full p-3 border-2 border-gray-300 rounded-lg font-bold text-gray-900 bg-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:font-bold hover:file:bg-blue-100"
+              />
+              {csvFile && (
+                <p className="text-xs text-green-600 mt-2">✓ {csvFile.name} を選択中</p>
+              )}
+            </div>
+            <button
+              onClick={handleCsvUpload}
+              disabled={!csvFile || uploading}
+              className="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition"
+            >
+              {uploading ? '処理中...' : 'アップロード'}
+            </button>
+          </div>
         </div>
 
         {/* システム情報 */}
