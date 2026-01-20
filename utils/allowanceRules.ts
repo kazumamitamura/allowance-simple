@@ -52,27 +52,53 @@ export const calculateAmountFromMaster = (
         return disasterAmount > 0 ? disasterAmount : 6000 // フォールバック: 6,000円
     }
 
-    // E/F 特例: 平日・休日に関わらず常にマスタ設定金額（2,400円）を適用
-    if (activityId === 'E' || activityId === 'F') {
-        const baseAmount = getMasterAmount(activityId)
-        // 運転なしの場合
-        if (!isDriving) {
-            return baseAmount
-        }
-        // 運転ありの場合
+    // 運転ありの場合の特別ルール（最優先）
+    if (isDriving) {
+        const baseAmount = activityId === 'C' ? getMasterAmount('C') : getMasterAmount(activityId)
+        
+        // 県外への運転: 15,000円（活動タイプに関係なく）
         if (destinationId === 'outside') {
-            return getMasterAmount('Outside_Driving') + (isAccommodation ? baseAmount : 0)
+            const drivingAmount = 15000
+            // E, Fで宿泊ありの場合のみ加算
+            return isAccommodation && (activityId === 'E' || activityId === 'F') 
+                ? drivingAmount + (baseAmount > 0 ? baseAmount : 2400) 
+                : drivingAmount
         }
+        
+        // 県内120km以上への運転: 7,500円（活動タイプに関係なく）
         if (destinationId === 'inside_long') {
-            return getMasterAmount('Inside_Long_Driving') + (isAccommodation ? baseAmount : 0)
+            const drivingAmount = 7500
+            // E, Fで宿泊ありの場合のみ加算
+            return isAccommodation && (activityId === 'E' || activityId === 'F') 
+                ? drivingAmount + (baseAmount > 0 ? baseAmount : 2400) 
+                : drivingAmount
         }
+        
+        // 管内または校内への運転
         if (destinationId === 'inside_short' || destinationId === 'school') {
-            if (isWorkDay) {
-                return getMasterAmount('Inside_Short_Driving_Workday') + (isAccommodation ? baseAmount : 0)
-            } else {
-                return baseAmount
+            // C. 指定大会の場合: 基本金額のみ
+            if (activityId === 'C') {
+                return baseAmount > 0 ? baseAmount : 3400
+            }
+            
+            // E, F. 遠征・合宿の場合: 勤務日は5100円
+            if (activityId === 'E' || activityId === 'F') {
+                if (isWorkDay) {
+                    const insideDrivingAmount = 5100
+                    return isAccommodation 
+                        ? insideDrivingAmount + (baseAmount > 0 ? baseAmount : 2400) 
+                        : insideDrivingAmount
+                } else {
+                    return baseAmount > 0 ? baseAmount : 2400
+                }
             }
         }
+    }
+    
+    // E/F 特例（運転なしの場合）: 平日・休日に関わらず常にマスタ設定金額（2,400円）を適用
+    if (activityId === 'E' || activityId === 'F') {
+        const baseAmount = getMasterAmount(activityId)
+        return baseAmount > 0 ? baseAmount : 2400
     }
 
     // その他の活動種別（既存ロジック）
