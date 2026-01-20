@@ -96,7 +96,7 @@ export default function AllowanceManagementPage() {
     // 2. 氏名マスタ取得
     const { data: userData } = await supabase.from('user_profiles').select('*')
     const pMap: Record<string, string> = {}
-    userData?.forEach((u: any) => pMap[u.email] = u.full_name)
+    userData?.forEach((u: any) => pMap[u.email] = u.display_name)
     setUserProfiles(pMap)
 
     // 3. 各申請の詳細データを取得
@@ -120,7 +120,7 @@ export default function AllowanceManagementPage() {
   }
 
   const fetchUsers = async () => {
-    const { data } = await supabase.from('user_profiles').select('*').order('full_name')
+    const { data } = await supabase.from('user_profiles').select('*').order('display_name')
     setUsers(data || [])
   }
 
@@ -196,7 +196,7 @@ export default function AllowanceManagementPage() {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '手当明細')
     
-    XLSX.writeFile(wb, `手当明細_${user?.full_name || selectedUser}_${yearMonth}.xlsx`)
+    XLSX.writeFile(wb, `手当明細_${user?.display_name || selectedUser}_${yearMonth}.xlsx`)
     
     setExporting(false)
     alert('ダウンロードしました！')
@@ -243,7 +243,7 @@ export default function AllowanceManagementPage() {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '年間集計')
     
-    XLSX.writeFile(wb, `手当年間集計_${user?.full_name || selectedUser}_${selectedYear}.xlsx`)
+    XLSX.writeFile(wb, `手当年間集計_${user?.display_name || selectedUser}_${selectedYear}.xlsx`)
     
     setExporting(false)
     alert('ダウンロードしました！')
@@ -265,7 +265,7 @@ export default function AllowanceManagementPage() {
       if (!userTotals[item.user_email]) {
         const user = users.find(u => u.email === item.user_email)
         userTotals[item.user_email] = {
-          name: user?.full_name || item.user_email,
+          name: user?.display_name || item.user_email,
           count: 0,
           amount: 0
         }
@@ -315,7 +315,7 @@ export default function AllowanceManagementPage() {
       if (!userTotals[item.user_email]) {
         const user = users.find(u => u.email === item.user_email)
         userTotals[item.user_email] = {
-          name: user?.full_name || item.user_email,
+          name: user?.display_name || item.user_email,
           count: 0,
           amount: 0
         }
@@ -518,7 +518,7 @@ export default function AllowanceManagementPage() {
                     <option value="">選択してください</option>
                     {users.map(user => (
                       <option key={user.email} value={user.email}>
-                        {user.full_name || user.email}
+                        {user.display_name || user.email}
                       </option>
                     ))}
                   </select>
@@ -565,7 +565,7 @@ export default function AllowanceManagementPage() {
                   選択した職員の指定月の手当明細を出力
                 </p>
                 <div className="text-xs text-slate-400">
-                  {selectedUser ? users.find(u => u.email === selectedUser)?.full_name : '職員未選択'} / {selectedYear}年{selectedMonth}月
+                  {selectedUser ? users.find(u => u.email === selectedUser)?.display_name : '職員未選択'} / {selectedYear}年{selectedMonth}月
                 </div>
               </button>
 
@@ -582,7 +582,7 @@ export default function AllowanceManagementPage() {
                   選択した職員の年間手当を月別集計
                 </p>
                 <div className="text-xs text-slate-400">
-                  {selectedUser ? users.find(u => u.email === selectedUser)?.full_name : '職員未選択'} / {selectedYear}年
+                  {selectedUser ? users.find(u => u.email === selectedUser)?.display_name : '職員未選択'} / {selectedYear}年
                 </div>
               </button>
 

@@ -36,7 +36,7 @@ export default function ExportPage() {
   }, [])
 
   const fetchUsers = async () => {
-    const { data } = await supabase.from('user_profiles').select('*').order('full_name')
+    const { data } = await supabase.from('user_profiles').select('*').order('display_name')
     setUsers(data || [])
   }
 
@@ -60,7 +60,7 @@ export default function ExportPage() {
       .order('date', { ascending: true })
 
     const user = users.find(u => u.email === selectedUser)
-    const userName = user?.full_name || selectedUser
+    const userName = user?.display_name || selectedUser
     
     // 合計計算
     const total = allowances?.reduce((sum, item) => sum + item.amount, 0) || 0
@@ -143,7 +143,7 @@ export default function ExportPage() {
       .order('date', { ascending: true })
 
     const user = users.find(u => u.email === selectedUser)
-    const userName = user?.full_name || selectedUser
+    const userName = user?.display_name || selectedUser
     
     // 月別集計
     const monthlyTotals: Record<number, number> = {}
@@ -222,7 +222,7 @@ export default function ExportPage() {
       if (!userTotals[item.user_email]) {
         const user = users.find(u => u.email === item.user_email)
         userTotals[item.user_email] = {
-          name: user?.full_name || item.user_email,
+          name: user?.display_name || item.user_email,
           count: 0,
           amount: 0,
           camp: 0,
@@ -304,7 +304,7 @@ export default function ExportPage() {
       if (!userTotals[item.user_email]) {
         const user = users.find(u => u.email === item.user_email)
         userTotals[item.user_email] = {
-          name: user?.full_name || item.user_email,
+          name: user?.display_name || item.user_email,
           count: 0,
           amount: 0,
           camp: 0,
@@ -407,7 +407,7 @@ export default function ExportPage() {
                 <option value="">選択してください</option>
                 {users.map(user => (
                   <option key={user.email} value={user.email}>
-                    {user.full_name || user.email}
+                    {user.display_name || user.email}
                   </option>
                 ))}
               </select>
@@ -456,7 +456,7 @@ export default function ExportPage() {
               選択した職員の指定月の手当明細を出力
             </p>
             <div className="text-xs text-slate-400">
-              {selectedUser ? users.find(u => u.email === selectedUser)?.full_name : '職員未選択'} / {selectedYear}年{selectedMonth}月
+              {selectedUser ? users.find(u => u.email === selectedUser)?.display_name : '職員未選択'} / {selectedYear}年{selectedMonth}月
             </div>
           </button>
 
