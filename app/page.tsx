@@ -94,20 +94,34 @@ export default function Home() {
 
   useEffect(() => {
     const init = async () => {
+      console.log('=== 初期化開始 ===')
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      if (!user) { 
+        console.log('ユーザー未認証、ログイン画面へ')
+        router.push('/login')
+        return 
+      }
+      console.log('ユーザー認証成功:', user.email)
       setUserEmail(user.email || '')
       setUserId(user.id)
-      if (ADMIN_EMAILS.includes(user.email?.toLowerCase() || '')) setIsAdmin(true)
+      if (ADMIN_EMAILS.includes(user.email?.toLowerCase() || '')) {
+        setIsAdmin(true)
+        console.log('管理者権限あり')
+      }
       
       // プロフィール取得
-      fetchProfile(user.id)
+      await fetchProfile(user.id)
 
-      fetchData(user.id)
-      fetchSchoolCalendar()
-      fetchAnnualSchedules()
-      fetchAllowanceTypes()
-      fetchApplicationStatus(user.id, selectedDate)
+      // データ取得（並行実行）
+      await Promise.all([
+        fetchData(user.id),
+        fetchSchoolCalendar(),
+        fetchAnnualSchedules(),
+        fetchAllowanceTypes(),
+        fetchApplicationStatus(user.id, selectedDate)
+      ])
+      
+      console.log('=== 初期化完了 ===')
     }
     init()
   }, [])
@@ -185,28 +199,41 @@ export default function Home() {
 
   // 月次集計の自動計算
   useEffect(() => {
+    console.log('=== 月次集計開始 ===')
+    console.log('全手当データ件数:', allowances.length)
+    console.log('選択月:', selectedDate.getFullYear(), '年', selectedDate.getMonth() + 1, '月')
+    
     const monthAllowances = allowances.filter(i => {
       const d = new Date(i.date)
-      return d.getMonth() === selectedDate.getMonth() && d.getFullYear() === selectedDate.getFullYear()
+      const match = d.getMonth() === selectedDate.getMonth() && d.getFullYear() === selectedDate.getFullYear()
+      console.log('日付:', i.date, '金額:', i.amount, '活動:', i.activity_type, '月一致:', match)
+      return match
     })
 
+    console.log('対象月の手当件数:', monthAllowances.length)
+    console.log('対象月の手当詳細:', monthAllowances)
+
     // 合計金額
-    const total = monthAllowances.reduce((sum, i) => sum + i.amount, 0)
+    const total = monthAllowances.reduce((sum, i) => {
+      console.log('加算:', sum, '+', i.amount, '=', sum + i.amount)
+      return sum + i.amount
+    }, 0)
+    console.log('計算された合計金額:', total)
     setMonthTotal(total)
 
     // 合宿日数（activity_typeに「合宿」を含む、またはcodeが'F'）
     const camps = monthAllowances.filter(a => 
-      a.activity_type.includes('合宿') || a.activity_type.includes('Training Camp')
+      a.activity_type?.includes('合宿') || a.activity_type?.includes('Training Camp') || a.activity_type?.includes('F.')
     ).length
     setCampDays(camps)
 
     // 遠征日数（activity_typeに「遠征」を含む、またはcodeが'E'）
     const expeditions = monthAllowances.filter(a => 
-      a.activity_type.includes('遠征') || a.activity_type.includes('Expedition')
+      a.activity_type?.includes('遠征') || a.activity_type?.includes('Expedition') || a.activity_type?.includes('E.')
     ).length
     setExpeditionDays(expeditions)
 
-    console.log('月次集計更新:', {
+    console.log('月次集計結果:', {
       year: selectedDate.getFullYear(),
       month: selectedDate.getMonth() + 1,
       total,
@@ -214,10 +241,12 @@ export default function Home() {
       expeditions,
       dataCount: monthAllowances.length
     })
+    console.log('=== 月次集計終了 ===')
   }, [allowances, selectedDate])
 
   const fetchData = async (uid: string) => {
-    console.log('手当データ取得中:', uid)
+    console.log('=== 手当データ取得開始 ===')
+    console.log('ユーザーID:', uid)
     try {
       const { data: allowData, error } = await supabase
         .from('allowances')
@@ -230,12 +259,17 @@ export default function Home() {
         setAllowances([])
       } else {
         console.log('手当データ取得成功:', allowData?.length, '件')
+        if (allowData && allowData.length > 0) {
+          console.log('取得したデータサンプル:', allowData[0])
+          console.log('全データ:', allowData)
+        }
         setAllowances(allowData || [])
       }
     } catch (err) {
       console.error('手当データ取得中の予期しないエラー:', err)
       setAllowances([])
     }
+    console.log('=== 手当データ取得終了 ===')
   }
 
   const fetchSchoolCalendar = async () => {
