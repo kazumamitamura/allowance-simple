@@ -26,6 +26,13 @@ export default function AllowanceSettingsPage() {
   const [allowanceTypes, setAllowanceTypes] = useState<AllowanceType[]>([])  // 空配列で初期化
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState({ display_name: '', base_amount: 0 })
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [newType, setNewType] = useState({
+    code: '',
+    display_name: '',
+    base_amount: 0,
+    requires_holiday: false
+  })
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -120,6 +127,73 @@ export default function AllowanceSettingsPage() {
     }
   }
 
+  const handleAddNew = async () => {
+    if (!newType.code || !newType.display_name || newType.base_amount < 0) {
+      alert('⚠️ すべての項目を正しく入力してください')
+      return
+    }
+
+    // コードの重複チェック
+    if (allowanceTypes.some(t => t.code === newType.code)) {
+      alert('⚠️ このコードは既に使用されています')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const { error } = await supabase
+        .from('allowance_types')
+        .insert({
+          code: newType.code.toUpperCase(),
+          display_name: newType.display_name,
+          base_amount: newType.base_amount,
+          requires_holiday: newType.requires_holiday
+        })
+
+      if (error) {
+        console.error('追加エラー:', error)
+        alert(`⚠️ 追加に失敗しました\n\nエラー: ${error.message}`)
+      } else {
+        alert('✅ 新しい手当種別を追加しました')
+        setShowAddModal(false)
+        setNewType({ code: '', display_name: '', base_amount: 0, requires_holiday: false })
+        fetchAllowanceTypes()
+      }
+    } catch (err) {
+      console.error('予期しないエラー:', err)
+      alert('⚠️ 追加中に予期しないエラーが発生しました')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDelete = async (id: number, code: string, displayName: string) => {
+    if (!confirm(`本当に削除しますか？\n\nコード: ${code}\n名前: ${displayName}\n\n※この操作は取り消せません。`)) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      const { error } = await supabase
+        .from('allowance_types')
+        .delete()
+        .eq('id', id)
+
+      if (error) {
+        console.error('削除エラー:', error)
+        alert(`⚠️ 削除に失敗しました\n\nエラー: ${error.message}`)
+      } else {
+        alert('✅ 削除しました')
+        fetchAllowanceTypes()
+      }
+    } catch (err) {
+      console.error('予期しないエラー:', err)
+      alert('⚠️ 削除中に予期しないエラーが発生しました')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleLogout = async () => {
     await logout()
     router.push('/login')
@@ -149,6 +223,19 @@ export default function AllowanceSettingsPage() {
           </p>
         </div>
 
+        {/* 新規追加ボタン */}
+        {!loading && (
+          <div className="mb-6 flex justify-end">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition font-bold shadow-lg flex items-center gap-2"
+            >
+              <span className="text-xl">➕</span>
+              新しい手当種別を追加
+            </button>
+          </div>
+        )}
+
         {/* ローディング中の表示 */}
         {loading && (
           <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
@@ -169,7 +256,7 @@ export default function AllowanceSettingsPage() {
                     <th className="px-6 py-4 font-bold">表示名</th>
                     <th className="px-6 py-4 font-bold text-right">基本金額 (円)</th>
                     <th className="px-6 py-4 font-bold text-center">休日限定</th>
-                    <th className="px-6 py-4 font-bold text-center">操作</th>
+                    <th className="px-6 py-4 font-bold text-center" colSpan={2}>操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -221,7 +308,7 @@ export default function AllowanceSettingsPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-3 py-4 text-center">
                       {editingId === type.id ? (
                         <div className="flex items-center justify-center gap-2">
                           <button
@@ -248,6 +335,16 @@ export default function AllowanceSettingsPage() {
                         </button>
                       )}
                     </td>
+                    <td className="px-3 py-4 text-center">
+                      {editingId !== type.id && (
+                        <button
+                          onClick={() => handleDelete(type.id, type.code, type.display_name)}
+                          className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-bold"
+                        >
+                          削除
+                        </button>
+                      )}
+                    </td>
                   </tr>
                   ))}
                 </tbody>
@@ -261,6 +358,102 @@ export default function AllowanceSettingsPage() {
           最終更新: {new Date().toLocaleString('ja-JP')}
         </div>
       </div>
+
+      {/* 新規追加モーダル */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-8" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">➕ 新しい手当種別を追加</h2>
+            
+            <div className="space-y-4">
+              {/* コード */}
+              <div>
+                <label className="block text-sm font-bold text-gray-900 mb-2">
+                  コード <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newType.code}
+                  onChange={(e) => setNewType({ ...newType, code: e.target.value.toUpperCase() })}
+                  placeholder="例: I"
+                  maxLength={1}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-900 font-mono text-lg"
+                />
+                <p className="text-xs text-gray-600 mt-1">1文字の英字（A-Z）を入力してください</p>
+              </div>
+
+              {/* 表示名 */}
+              <div>
+                <label className="block text-sm font-bold text-gray-900 mb-2">
+                  表示名 <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newType.display_name}
+                  onChange={(e) => setNewType({ ...newType, display_name: e.target.value })}
+                  placeholder="例: I.研修旅行引率"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                />
+              </div>
+
+              {/* 基本金額 */}
+              <div>
+                <label className="block text-sm font-bold text-gray-900 mb-2">
+                  基本金額（円） <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={newType.base_amount}
+                  onChange={(e) => setNewType({ ...newType, base_amount: parseInt(e.target.value) || 0 })}
+                  min="0"
+                  step="100"
+                  placeholder="例: 2400"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-right"
+                />
+              </div>
+
+              {/* 休日限定 */}
+              <div>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newType.requires_holiday}
+                    onChange={(e) => setNewType({ ...newType, requires_holiday: e.target.checked })}
+                    className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-bold text-gray-900">
+                    休日のみ選択可能にする
+                  </span>
+                </label>
+                <p className="text-xs text-gray-600 mt-1 ml-8">
+                  チェックすると、勤務日には選択できなくなります
+                </p>
+              </div>
+            </div>
+
+            {/* ボタン */}
+            <div className="flex gap-3 mt-8">
+              <button
+                onClick={handleAddNew}
+                disabled={loading}
+                className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-bold disabled:opacity-50"
+              >
+                追加
+              </button>
+              <button
+                onClick={() => {
+                  setShowAddModal(false)
+                  setNewType({ code: '', display_name: '', base_amount: 0, requires_holiday: false })
+                }}
+                disabled={loading}
+                className="flex-1 bg-gray-600 text-white py-3 rounded-lg hover:bg-gray-700 transition font-bold disabled:opacity-50"
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
