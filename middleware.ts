@@ -35,10 +35,12 @@ export async function middleware(request: NextRequest) {
   // ログイン画面とauth関連のパスは認証不要
   if (
     request.nextUrl.pathname.startsWith('/login') ||
-    request.nextUrl.pathname.startsWith('/auth')
+    request.nextUrl.pathname.startsWith('/auth') ||
+    request.nextUrl.pathname.startsWith('/forgot-password') ||
+    request.nextUrl.pathname.startsWith('/reset-password')
   ) {
-    // すでにログイン済みの場合は / にリダイレクト
-    if (user) {
+    // すでにログイン済みの場合は / にリダイレクト（パスワードリセットページを除く）
+    if (user && !request.nextUrl.pathname.startsWith('/reset-password')) {
       return NextResponse.redirect(new URL('/', request.url))
     }
     return supabaseResponse

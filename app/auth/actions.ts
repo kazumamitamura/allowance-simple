@@ -15,14 +15,31 @@ export async function login(formData: FormData) {
   const cookieStore = await cookies()
   const supabase = createClient(cookieStore)
 
-  const { error } = await supabase.auth.signInWithPassword({
+  console.log('ログイン試行:', email)
+
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   })
 
   if (error) {
-    return { error: 'ログインに失敗しました。メールアドレスまたはパスワードが正しくありません。' }
+    console.error('ログインエラー:', error.message, error.status)
+    
+    // エラー内容に応じた詳細なメッセージ
+    if (error.message.includes('Email not confirmed')) {
+      return { error: 'メールアドレスが確認されていません。確認メールをご確認ください。' }
+    }
+    if (error.message.includes('Invalid login credentials')) {
+      return { error: 'メールアドレスまたはパスワードが正しくありません。' }
+    }
+    
+    return { error: `ログインに失敗しました: ${error.message}` }
   }
+
+  console.log('ログイン成功:', data.user?.id)
+
+  // セッションが確立されるまで少し待つ
+  await new Promise(resolve => setTimeout(resolve, 500))
 
   redirect('/')
 }
