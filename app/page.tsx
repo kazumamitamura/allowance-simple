@@ -117,8 +117,8 @@ export default function Home() {
         return
       }
       
-      // display_name と full_name の両方をチェック
-      const name = data?.display_name || data?.full_name || ''
+      // display_name のみをチェック（full_nameカラムは存在しない）
+      const name = data?.display_name || ''
       console.log('取得した氏名:', name)
       
       if (name) {
@@ -140,12 +140,11 @@ export default function Home() {
       
       console.log('氏名保存開始:', { userId, fullName })
       
-      // display_name と full_name の両方を更新（互換性のため）
+      // display_name のみを更新
       const { data, error } = await supabase
         .from('user_profiles')
         .update({ 
-          display_name: fullName,
-          full_name: fullName  // full_name カラムも更新
+          display_name: fullName
         })
         .eq('user_id', userId)
         .select()
