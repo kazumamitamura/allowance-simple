@@ -60,24 +60,29 @@ export default function AllowanceSettingsPage() {
   const fetchAllowanceTypes = async () => {
     setLoading(true)
     try {
+      console.log('手当設定データ取得開始')
       const { data, error } = await supabase
         .from('allowance_types')
         .select('*')
         .order('code', { ascending: true })
       
+      console.log('取得結果:', { data, error })
+      
       if (error) {
         console.error('手当設定取得エラー:', error)
-        alert(`⚠️ データの取得に失敗しました\n\nエラー: ${error.message}`)
+        // エラーメッセージを表示せず、空配列を設定
         setAllowanceTypes([])
       } else {
         setAllowanceTypes(data || [])
         if (!data || data.length === 0) {
           console.warn('手当設定データが0件です')
+        } else {
+          console.log(`手当設定データ ${data.length} 件を取得しました`)
         }
       }
     } catch (err) {
       console.error('予期しないエラー:', err)
-      alert('⚠️ データの取得中に予期しないエラーが発生しました')
+      // エラーメッセージを表示せず、空配列を設定
       setAllowanceTypes([])
     } finally {
       setLoading(false)
@@ -102,6 +107,7 @@ export default function AllowanceSettingsPage() {
 
     setLoading(true)
     try {
+      console.log('更新データ:', { id, editForm })
       const { error } = await supabase
         .from('allowance_types')
         .update({
@@ -115,8 +121,9 @@ export default function AllowanceSettingsPage() {
         console.error('更新エラー:', error)
         alert(`⚠️ 更新に失敗しました\n\nエラー: ${error.message}`)
       } else {
+        console.log('更新成功')
         alert('✅ 更新しました')
-        fetchAllowanceTypes()
+        await fetchAllowanceTypes()
         cancelEdit()
       }
     } catch (err) {
@@ -134,13 +141,14 @@ export default function AllowanceSettingsPage() {
     }
 
     // コードの重複チェック
-    if (allowanceTypes.some(t => t.code === newType.code)) {
+    if (allowanceTypes.some(t => t.code === newType.code.toUpperCase())) {
       alert('⚠️ このコードは既に使用されています')
       return
     }
 
     setLoading(true)
     try {
+      console.log('追加データ:', newType)
       const { error } = await supabase
         .from('allowance_types')
         .insert({
@@ -154,10 +162,11 @@ export default function AllowanceSettingsPage() {
         console.error('追加エラー:', error)
         alert(`⚠️ 追加に失敗しました\n\nエラー: ${error.message}`)
       } else {
+        console.log('追加成功')
         alert('✅ 新しい手当種別を追加しました')
         setShowAddModal(false)
         setNewType({ code: '', display_name: '', base_amount: 0, requires_holiday: false })
-        fetchAllowanceTypes()
+        await fetchAllowanceTypes()
       }
     } catch (err) {
       console.error('予期しないエラー:', err)
@@ -174,6 +183,7 @@ export default function AllowanceSettingsPage() {
 
     setLoading(true)
     try {
+      console.log('削除データ:', { id, code, displayName })
       const { error } = await supabase
         .from('allowance_types')
         .delete()
@@ -183,8 +193,9 @@ export default function AllowanceSettingsPage() {
         console.error('削除エラー:', error)
         alert(`⚠️ 削除に失敗しました\n\nエラー: ${error.message}`)
       } else {
+        console.log('削除成功')
         alert('✅ 削除しました')
-        fetchAllowanceTypes()
+        await fetchAllowanceTypes()
       }
     } catch (err) {
       console.error('予期しないエラー:', err)

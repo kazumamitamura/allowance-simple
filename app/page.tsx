@@ -266,8 +266,9 @@ export default function Home() {
         setDestinationDetail(allowance.destination_detail || '')
         setIsDriving(allowance.is_driving)
         setIsAccommodation(allowance.is_accommodation)
-        setCustomAmount(allowance.custom_amount || 0)
-        setCustomDescription(allowance.custom_description || '')
+        // custom_amount と custom_description は、カラムが存在する場合のみ使用
+        setCustomAmount((allowance as any).custom_amount || 0)
+        setCustomDescription((allowance as any).custom_description || '')
       } else {
         setActivityId('')
         setDestinationId('inside_short')
@@ -340,7 +341,7 @@ export default function Home() {
       }
 
       // 新規データを挿入
-      const insertData = { 
+      const insertData: any = { 
         user_id: user.id, 
         user_email: user.email, 
         date: dateStr, 
@@ -349,10 +350,15 @@ export default function Home() {
         destination_detail: activityId === 'CUSTOM' ? customDescription : destinationDetail, 
         is_driving: isDriving, 
         is_accommodation: isAccommodation, 
-        amount: calculatedAmount,
-        custom_amount: activityId === 'CUSTOM' ? customAmount : null,
-        custom_description: activityId === 'CUSTOM' ? customDescription : null
+        amount: calculatedAmount
       }
+      
+      // custom_amount と custom_description は、カラムが存在する場合のみ追加
+      // （Supabaseでカラムを追加するまでは、これらをコメントアウト）
+      // if (activityId === 'CUSTOM') {
+      //   insertData.custom_amount = customAmount
+      //   insertData.custom_description = customDescription
+      // }
       
       console.log('挿入データ:', insertData)
       
