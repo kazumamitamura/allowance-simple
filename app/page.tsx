@@ -387,16 +387,31 @@ export default function Home() {
   }, [selectedDate, allowances, schoolCalendar])
 
   useEffect(() => {
+    console.log('=== 支給予定額の計算開始 ===')
+    console.log('activityId:', activityId)
+    console.log('dayType:', dayType)
+    console.log('isDriving:', isDriving)
+    console.log('destinationId:', destinationId)
+    console.log('isAccommodation:', isAccommodation)
+    console.log('allowanceTypes件数:', allowanceTypes.length)
+    
     const isWorkDay = dayType.includes('勤務日') || dayType.includes('授業')
-    if (!activityId) { setCalculatedAmount(0); return }
+    console.log('勤務日判定:', isWorkDay)
+    
+    if (!activityId) { 
+      console.log('activityIdが未選択のため、0円')
+      setCalculatedAmount(0)
+      return 
+    }
     
     const validation = canSelectActivity(activityId, isWorkDay)
     if (!validation.allowed) {
-      console.warn(validation.message)
+      console.warn('選択制限:', validation.message)
     }
     
     // 手入力その他（CUSTOM）の場合は、カスタム金額を使用
     if (activityId === 'CUSTOM') {
+      console.log('手入力その他:', customAmount, '円')
       setCalculatedAmount(customAmount)
       return
     }
@@ -406,6 +421,9 @@ export default function Home() {
     const amt = allowanceTypes.length > 0 
       ? calculateAmountFromMaster(activityId, isDriving, destinationId, isWorkDay, isAccommodation, isHalfDay, allowanceTypes)
       : calculateAmount(activityId, isDriving, destinationId, isWorkDay, isAccommodation, isHalfDay)
+    
+    console.log('計算結果:', amt, '円')
+    console.log('=== 支給予定額の計算終了 ===')
     setCalculatedAmount(amt)
   }, [activityId, isDriving, destinationId, dayType, isAccommodation, allowanceTypes, customAmount])
 
