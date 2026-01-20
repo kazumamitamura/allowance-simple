@@ -48,7 +48,8 @@ export const calculateAmountFromMaster = (
 
     // 災害業務（新規）
     if (activityId === 'DISASTER') {
-        return getMasterAmount('Disaster')
+        const disasterAmount = getMasterAmount('Disaster')
+        return disasterAmount > 0 ? disasterAmount : 6000 // フォールバック: 6,000円
     }
 
     // E/F 特例: 平日・休日に関わらず常にマスタ設定金額（2,400円）を適用
