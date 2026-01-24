@@ -1093,8 +1093,8 @@ export default function Home() {
                             )}
                         </div>
                         
-                        {/* 指定大会 + 運転ありの場合は目的地も入力 */}
-                        {activityId === 'C' && isDriving && (
+                        {/* 指定大会 + 運転あり + (県内120km以上 or 県外) の場合は目的地も入力 */}
+                        {activityId === 'C' && isDriving && (destinationId === 'inside_long' || destinationId === 'outside') && (
                             <div>
                                 <label className="block text-xs font-bold text-green-700 mb-1">目的地（運転先） 🚗</label>
                                 <input 
@@ -1105,11 +1105,12 @@ export default function Home() {
                                     onChange={(e) => setDestinationDetail(e.target.value)} 
                                     className="w-full bg-green-50 p-3 rounded-lg border-2 border-green-300 text-xs text-black font-bold" 
                                 />
+                                <div className="text-xs text-green-600 mt-1">※県内120km以上または県外の運転先を入力してください</div>
                             </div>
                         )}
                         
-                        {/* 指定大会以外で運転ありの場合は目的地入力を表示 */}
-                        {activityId !== 'C' && isDriving && (
+                        {/* 指定大会以外 + 運転あり + (県内120km以上 or 県外) の場合は目的地入力を表示 */}
+                        {activityId !== 'C' && isDriving && (destinationId === 'inside_long' || destinationId === 'outside') && (
                             <div>
                                 <label className="block text-xs font-bold text-green-700 mb-1">目的地（運転先） 🚗</label>
                                 <input 
@@ -1120,6 +1121,7 @@ export default function Home() {
                                     onChange={(e) => setDestinationDetail(e.target.value)} 
                                     className="w-full bg-green-50 p-3 rounded-lg border-2 border-green-300 text-xs text-black font-bold" 
                                 />
+                                <div className="text-xs text-green-600 mt-1">※県内120km以上または県外の運転先を入力してください</div>
                             </div>
                         )}
                     </div>
