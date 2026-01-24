@@ -772,56 +772,78 @@ export default function Home() {
               </div>
               
               {/* 氏名・複数選択・ログアウト - スマホでは横並び */}
-              <div className="flex gap-2 w-full sm:w-auto flex-wrap">
-                <button onClick={() => setShowProfileModal(true)} className="text-xs sm:text-sm font-bold text-slate-600 bg-slate-100 px-3 sm:px-4 py-2 rounded-full border border-slate-200 hover:bg-slate-200 active:bg-slate-300 transition touch-manipulation flex-1 sm:flex-none whitespace-nowrap">
-                    {userName ? `👤 ${userName.length > 6 ? userName.substring(0, 6) + '...' : userName}` : '⚙️ 氏名登録'}
-                </button>
-                
-                {/* 複数選択モードボタン（スマホのみ） */}
-                <button
-                  onClick={() => setIsMultiSelectMode(!isMultiSelectMode)}
-                  className={`text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 rounded-full border transition touch-manipulation lg:hidden ${
-                    isMultiSelectMode 
-                      ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
-                      : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
-                  }`}
-                >
-                  {isMultiSelectMode ? '📅 選択中' : '📅 複数選択'}
-                </button>
-                
-                {/* PC用ヒント（PC のみ） */}
-                <div className="hidden lg:flex items-center text-xs text-gray-500 px-2">
-                  Ctrl/Cmd+クリックで複数選択
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <div className="flex gap-2">
+                  <button onClick={() => setShowProfileModal(true)} className="text-xs sm:text-sm font-bold text-slate-600 bg-slate-100 px-3 sm:px-4 py-2 rounded-full border border-slate-200 hover:bg-slate-200 active:bg-slate-300 transition touch-manipulation flex-1 sm:flex-none whitespace-nowrap">
+                      {userName ? `👤 ${userName.length > 6 ? userName.substring(0, 6) + '...' : userName}` : '⚙️ 氏名登録'}
+                  </button>
+                  
+                  <button onClick={handleLogout} className="text-xs sm:text-sm font-bold text-slate-600 bg-slate-100 px-3 sm:px-4 py-2 rounded-full border border-slate-200 hover:bg-slate-200 active:bg-slate-300 transition touch-manipulation">ログアウト</button>
                 </div>
                 
-                <button onClick={handleLogout} className="text-xs sm:text-sm font-bold text-slate-600 bg-slate-100 px-3 sm:px-4 py-2 rounded-full border border-slate-200 hover:bg-slate-200 active:bg-slate-300 transition touch-manipulation">ログアウト</button>
+                {/* 複数選択モードボタン（大きく表示） */}
+                <button
+                  onClick={() => setIsMultiSelectMode(!isMultiSelectMode)}
+                  className={`text-sm font-bold px-4 py-2 rounded-full border-2 transition touch-manipulation shadow-md ${
+                    isMultiSelectMode 
+                      ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700 shadow-blue-300' 
+                      : 'bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border-blue-300 hover:from-blue-100 hover:to-blue-200'
+                  }`}
+                >
+                  {isMultiSelectMode ? '✅ 選択モード中（タップで選択/解除）' : '📅 複数日まとめて入力'}
+                </button>
               </div>
               
               {/* 複数選択モード中の案内バー */}
               {(isMultiSelectMode || selectedDates.length > 0) && (
-                <div className="mt-3 bg-blue-50 border-2 border-blue-300 rounded-lg p-3 flex flex-col sm:flex-row items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-blue-800 font-bold text-sm">
-                      {selectedDates.length > 0 
-                        ? `✅ ${selectedDates.length}日選択中` 
-                        : '日付をタップして選択してください'}
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
+                <div className="mt-3 bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-400 rounded-xl p-4 shadow-lg">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl">📅</span>
+                        <div>
+                          <span className="text-blue-900 font-extrabold text-lg block">
+                            {selectedDates.length > 0 
+                              ? `${selectedDates.length}日選択中` 
+                              : 'カレンダーから日付を選択'}
+                          </span>
+                          <span className="text-blue-700 text-xs">
+                            {selectedDates.length > 0 
+                              ? '内容を入力してまとめて保存できます' 
+                              : 'タップするたびに選択/解除できます'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleMultiSelectCancel}
+                        className="bg-slate-400 hover:bg-slate-500 text-white font-bold py-2 px-3 rounded-lg transition text-sm touch-manipulation"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    
+                    {/* 選択された日付のリスト */}
+                    {selectedDates.length > 0 && (
+                      <div className="bg-white rounded-lg p-3 border border-blue-200">
+                        <div className="text-xs text-blue-700 font-bold mb-2">選択した日付:</div>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedDates.map((date, index) => (
+                            <span key={index} className="text-xs px-2 py-1 rounded-full font-bold bg-blue-600 text-white">
+                              {date.getMonth() + 1}/{date.getDate()}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
                     {selectedDates.length > 0 && (
                       <button
                         onClick={handleMultiSelectComplete}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition text-sm touch-manipulation"
+                        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-6 rounded-xl transition shadow-lg text-base touch-manipulation"
                       >
-                        入力する
+                        ✏️ 選択した{selectedDates.length}日分の内容を入力する
                       </button>
                     )}
-                    <button
-                      onClick={handleMultiSelectCancel}
-                      className="bg-slate-300 hover:bg-slate-400 text-slate-700 font-bold py-2 px-4 rounded-lg transition text-sm touch-manipulation"
-                    >
-                      キャンセル
-                    </button>
                   </div>
                 </div>
               )}
@@ -874,17 +896,39 @@ export default function Home() {
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4" onClick={() => setShowInputModal(false)}>
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl h-[95vh] sm:h-auto sm:max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             {/* モーダルヘッダー */}
-            <div className="sticky top-0 bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center rounded-t-2xl z-10">
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-start rounded-t-2xl z-10">
               <div className="flex-1">
-                <h2 className="font-bold text-gray-900 text-base sm:text-lg">{selectedDate.getMonth() + 1}月{selectedDate.getDate()}日 ({['日', '月', '火', '水', '木', '金', '土'][selectedDate.getDay()]}) の手当入力</h2>
-                <div className="flex gap-2 mt-2">
-                  {isAllowLocked && <span className="text-xs px-2 py-1 rounded font-bold bg-gray-100 text-gray-500">💰 編集不可</span>}
-                  <span className={`text-xs px-2 py-1 rounded font-bold ${dayType.includes('休日') || dayType.includes('週休') ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
-                    {dayType}
-                  </span>
-                </div>
+                {selectedDates.length > 0 ? (
+                  <>
+                    <h2 className="font-bold text-gray-900 text-base sm:text-lg mb-2">
+                      📅 複数日一括入力（{selectedDates.length}日分）
+                    </h2>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedDates.slice(0, 10).map((date, index) => (
+                        <span key={index} className="text-xs px-2 py-1 rounded font-bold bg-blue-100 text-blue-700">
+                          {date.getMonth() + 1}/{date.getDate()}
+                        </span>
+                      ))}
+                      {selectedDates.length > 10 && (
+                        <span className="text-xs px-2 py-1 rounded font-bold bg-gray-100 text-gray-600">
+                          他 {selectedDates.length - 10}日
+                        </span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="font-bold text-gray-900 text-base sm:text-lg">{selectedDate.getMonth() + 1}月{selectedDate.getDate()}日 ({['日', '月', '火', '水', '木', '金', '土'][selectedDate.getDay()]}) の手当入力</h2>
+                    <div className="flex gap-2 mt-2">
+                      {isAllowLocked && <span className="text-xs px-2 py-1 rounded font-bold bg-gray-100 text-gray-500">💰 編集不可</span>}
+                      <span className={`text-xs px-2 py-1 rounded font-bold ${dayType.includes('休日') || dayType.includes('週休') ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                        {dayType}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
-              <button onClick={() => setShowInputModal(false)} className="text-slate-400 hover:text-slate-600 active:text-slate-800 text-3xl sm:text-2xl font-bold ml-2 touch-manipulation">×</button>
+              <button onClick={() => { setShowInputModal(false); setSelectedDates([]); setIsMultiSelectMode(false); }} className="text-slate-400 hover:text-slate-600 active:text-slate-800 text-3xl sm:text-2xl font-bold ml-2 touch-manipulation">×</button>
             </div>
 
             {/* モーダルコンテンツ */}
@@ -998,16 +1042,14 @@ export default function Home() {
                                 </select>
                             </div>
                             
-                            {/* 条件分岐: 運転ありの場合は目的地、指定大会の場合は大会名 */}
-                            {(isDriving || activityId === 'C') && (
+                            {/* 運転ありの場合のみ目的地入力を表示 */}
+                            {isDriving && (
                                 <div>
-                                    <label className="block text-xs font-bold text-black mb-1">
-                                        {activityId === 'C' ? '大会名' : '目的地'}
-                                    </label>
+                                    <label className="block text-xs font-bold text-black mb-1">目的地</label>
                                     <input 
                                         disabled={isAllowLocked} 
                                         type="text" 
-                                        placeholder={activityId === 'C' ? '例: 県高校総体' : '例: 県体育館'} 
+                                        placeholder="例: 県体育館" 
                                         value={destinationDetail} 
                                         onChange={(e) => setDestinationDetail(e.target.value)} 
                                         className="w-full bg-white p-3 rounded-lg border border-slate-200 text-xs text-black font-bold" 
