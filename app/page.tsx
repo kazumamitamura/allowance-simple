@@ -54,6 +54,8 @@ export default function Home() {
   const [allowanceStatus, setAllowanceStatus] = useState<'draft' | 'submitted' | 'approved'>('draft')
   
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]) // 複数日選択用
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false) // 複数選択モード
   const [dayType, setDayType] = useState<string>('---')
   
   // 月次集計データ
@@ -433,18 +435,21 @@ export default function Home() {
       alert('手当が申請済みのため、編集できません。')
       return 
     }
-      const dateStr = formatDate(selectedDate)
+    
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       console.error('ユーザー情報が取得できません')
       alert('ユーザー情報が取得できません。再ログインしてください。')
-          return
-      }
-      
+      return
+    }
+    
+    // 保存対象の日付リスト（複数選択されている場合は全日付、そうでなければ単一日付）
+    const targetDates = selectedDates.length > 0 ? selectedDates : [selectedDate]
+    
     console.log('保存するユーザー:', {
       user_id: user.id,
       email: user.email,
-      date: dateStr
+      dates: targetDates.map(d => formatDate(d))
     })
 
     if (activityId) {
@@ -453,57 +458,63 @@ export default function Home() {
         if (!customDescription || customAmount <= 0) {
           alert('手入力その他を選択した場合、内容と金額を必ず入力してください。')
           return
+        }
       }
-  }
+      
+      // 各日付に対してデータを保存
+      for (const date of targetDates) {
+        const dateStr = formatDate(date)
+        
+        // 既存データを削除
+        const { error: deleteError } = await supabase.from('allowances').delete().eq('user_id', user.id).eq('date', dateStr)
+        if (deleteError) {
+          console.error('削除エラー:', dateStr, deleteError)
+        }
 
-      // 既存データを削除
-      const { error: deleteError } = await supabase.from('allowances').delete().eq('user_id', user.id).eq('date', dateStr)
-      if (deleteError) {
-        console.error('削除エラー:', deleteError)
+        // 新規データを挿入
+        const insertData: any = { 
+          user_id: user.id, 
+          user_email: user.email, 
+          date: dateStr, 
+          activity_type: ACTIVITY_TYPES.find(a => a.id === activityId)?.label || activityId, 
+          destination_type: DESTINATIONS.find(d => d.id === destinationId)?.label, 
+          destination_detail: activityId === 'CUSTOM' ? customDescription : destinationDetail, 
+          is_driving: isDriving, 
+          is_accommodation: isAccommodation, 
+          amount: calculatedAmount
+        }
+        
+        console.log('挿入データ:', dateStr, insertData)
+        
+        const { data: insertedData, error: insertError } = await supabase.from('allowances').insert(insertData).select()
+        
+        if (insertError) {
+          console.error('挿入エラー:', dateStr, insertError)
+          alert(`${dateStr} の保存に失敗しました: ${insertError.message}`)
+          return
+        }
+        
+        console.log('挿入成功:', dateStr, insertedData)
       }
-
-      // 新規データを挿入
-      const insertData: any = { 
-        user_id: user.id, 
-        user_email: user.email, 
-        date: dateStr, 
-        activity_type: ACTIVITY_TYPES.find(a => a.id === activityId)?.label || activityId, 
-        destination_type: DESTINATIONS.find(d => d.id === destinationId)?.label, 
-        destination_detail: activityId === 'CUSTOM' ? customDescription : destinationDetail, 
-        is_driving: isDriving, 
-        is_accommodation: isAccommodation, 
-        amount: calculatedAmount
-      }
-      
-      // custom_amount と custom_description は、カラムが存在する場合のみ追加
-      // （Supabaseでカラムを追加するまでは、これらをコメントアウト）
-      // if (activityId === 'CUSTOM') {
-      //   insertData.custom_amount = customAmount
-      //   insertData.custom_description = customDescription
-      // }
-      
-      console.log('挿入データ:', insertData)
-      
-      const { data: insertedData, error: insertError } = await supabase.from('allowances').insert(insertData).select()
-      
-      if (insertError) {
-        console.error('挿入エラー:', insertError)
-        alert('保存に失敗しました: ' + insertError.message)
-        return
-      }
-      
-      console.log('挿入成功:', insertedData)
-        } else {
+    } else {
       // 手当なしの場合は削除のみ
-      const { error: deleteError } = await supabase.from('allowances').delete().eq('user_id', user.id).eq('date', dateStr)
-      if (deleteError) {
-        console.error('削除エラー:', deleteError)
+      for (const date of targetDates) {
+        const dateStr = formatDate(date)
+        const { error: deleteError } = await supabase.from('allowances').delete().eq('user_id', user.id).eq('date', dateStr)
+        if (deleteError) {
+          console.error('削除エラー:', dateStr, deleteError)
+        }
       }
     }
     
     await fetchData(user.id)
     setShowInputModal(false)
-    alert('保存しました')
+    setSelectedDates([]) // 複数選択をクリア
+    
+    const message = targetDates.length > 1 
+      ? `${targetDates.length}日分のデータを保存しました` 
+      : '保存しました'
+    alert(message)
   }
 
   const handleDelete = async (id: number, dateStr: string) => { 
@@ -570,14 +581,63 @@ export default function Home() {
   const handleNextMonth = () => { const d = new Date(selectedDate); d.setMonth(d.getMonth() + 1); setSelectedDate(d) }
   
   // カレンダー日付クリック時の処理
-  const handleDateClick = (date: Date) => {
-    setSelectedDate(date)
-    // ロックチェック
-    if (getLockStatus(date)) {
-      alert('⏰ 締め切り済みのため編集できません\n\n対象月の翌月10日までに入力・編集を完了してください。')
+  const handleDateClick = (date: Date, event?: React.MouseEvent) => {
+    // 複数選択モード（PC: Ctrl/Cmd押下、スマホ: 複数選択モード有効）
+    const isMultiSelect = isMultiSelectMode || event?.ctrlKey || event?.metaKey
+    
+    if (isMultiSelect) {
+      // 複数選択モード: 日付を配列に追加/削除（トグル）
+      const dateStr = formatDate(date)
+      const isAlreadySelected = selectedDates.some(d => formatDate(d) === dateStr)
+      
+      if (isAlreadySelected) {
+        // 既に選択されている場合は削除
+        setSelectedDates(selectedDates.filter(d => formatDate(d) !== dateStr))
+      } else {
+        // 未選択の場合は追加
+        setSelectedDates([...selectedDates, date])
+      }
+      
+      // 最初の日付を選択した場合、それをselectedDateにも設定
+      if (selectedDates.length === 0) {
+        setSelectedDate(date)
+      }
+    } else {
+      // 単一選択モード
+      setSelectedDate(date)
+      setSelectedDates([]) // 複数選択をクリア
+      
+      // ロックチェック
+      if (getLockStatus(date)) {
+        alert('⏰ 締め切り済みのため編集できません\n\n対象月の翌月10日までに入力・編集を完了してください。')
+        return
+      }
+      setShowInputModal(true)
+    }
+  }
+  
+  // 複数選択モードの完了
+  const handleMultiSelectComplete = () => {
+    if (selectedDates.length === 0) {
+      alert('日付を選択してください')
       return
     }
+    
+    // ロックチェック（選択された日付のいずれかがロックされている場合）
+    const hasLockedDate = selectedDates.some(date => getLockStatus(date))
+    if (hasLockedDate) {
+      alert('⏰ 選択した日付の中に締め切り済みのものが含まれています\n\n対象月の翌月10日までに入力・編集を完了してください。')
+      return
+    }
+    
+    setIsMultiSelectMode(false)
     setShowInputModal(true)
+  }
+  
+  // 複数選択モードのキャンセル
+  const handleMultiSelectCancel = () => {
+    setIsMultiSelectMode(false)
+    setSelectedDates([])
   }
 
   const getTileContent = ({ date, view }: { date: Date; view: string }) => {
@@ -591,6 +651,9 @@ export default function Home() {
     const isToday = date.getDate() === today.getDate() && 
                     date.getMonth() === today.getMonth() && 
                     date.getFullYear() === today.getFullYear()
+    
+    // 複数選択されているかどうか判定
+    const isSelected = selectedDates.some(d => formatDate(d) === dateStr)
 
     // 背景色とボーダーの設定
     let bgClass = 'bg-gray-50' // 未入力の日（薄いグレー）
@@ -604,9 +667,24 @@ export default function Home() {
     if (isToday) {
       borderClass = 'border-2 border-blue-500' // 今日（青い枠線）
     }
+    
+    if (isSelected) {
+      bgClass = 'bg-blue-100' // 選択中の日（青い背景）
+      borderClass = 'border-3 border-blue-600' // 選択中（太い青い枠線）
+    }
 
     return ( 
-        <div className={`flex flex-col items-start justify-start w-full h-full p-2 rounded-lg ${bgClass} ${borderClass} min-h-[60px] relative`}>
+        <div 
+            className={`flex flex-col items-start justify-start w-full h-full p-2 rounded-lg ${bgClass} ${borderClass} min-h-[60px] relative cursor-pointer hover:opacity-80 transition`}
+            onClick={(e) => handleDateClick(date, e)}
+        >
+            {/* 選択中のチェックマーク */}
+            {isSelected && (
+                <div className="absolute top-1 left-1 bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                    ✓
+                </div>
+            )}
+            
             {/* 勤務区分（右上に小さく表示） */}
             {schedule && schedule.work_type && (
                 <div className="absolute top-1 right-1 px-1.5 py-0.5 bg-purple-100 border border-purple-300 rounded text-xs font-bold text-purple-700">
@@ -617,7 +695,7 @@ export default function Home() {
             {/* 日付番号（今日は青い丸で強調） */}
             <div className={`text-xs font-bold mb-1 ${isToday ? 'bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center' : 'text-gray-900'}`}>
                 {date.getDate()}
-                </div>
+            </div>
             
             {/* 手当金額（入力済みの場合のみ表示） */}
             {allowance && (
@@ -693,12 +771,60 @@ export default function Home() {
                   {allowanceStatus === 'draft' && !isAllowLocked && <button onClick={handleSubmit} className="text-sm sm:text-base font-bold text-white bg-blue-600 px-5 sm:px-6 py-2.5 sm:py-3 rounded-full hover:bg-blue-700 active:bg-blue-800 shadow-md transition touch-manipulation w-full sm:w-auto">💰 手当申請</button>}
               </div>
               
-              {/* 氏名・ログアウト - スマホでは横並び */}
-              <div className="flex gap-2 w-full sm:w-auto">
+              {/* 氏名・複数選択・ログアウト - スマホでは横並び */}
+              <div className="flex gap-2 w-full sm:w-auto flex-wrap">
                 <button onClick={() => setShowProfileModal(true)} className="text-xs sm:text-sm font-bold text-slate-600 bg-slate-100 px-3 sm:px-4 py-2 rounded-full border border-slate-200 hover:bg-slate-200 active:bg-slate-300 transition touch-manipulation flex-1 sm:flex-none whitespace-nowrap">
                     {userName ? `👤 ${userName.length > 6 ? userName.substring(0, 6) + '...' : userName}` : '⚙️ 氏名登録'}
-              </button>
+                </button>
+                
+                {/* 複数選択モードボタン（スマホのみ） */}
+                <button
+                  onClick={() => setIsMultiSelectMode(!isMultiSelectMode)}
+                  className={`text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 rounded-full border transition touch-manipulation lg:hidden ${
+                    isMultiSelectMode 
+                      ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
+                      : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                  }`}
+                >
+                  {isMultiSelectMode ? '📅 選択中' : '📅 複数選択'}
+                </button>
+                
+                {/* PC用ヒント（PC のみ） */}
+                <div className="hidden lg:flex items-center text-xs text-gray-500 px-2">
+                  Ctrl/Cmd+クリックで複数選択
+                </div>
+                
                 <button onClick={handleLogout} className="text-xs sm:text-sm font-bold text-slate-600 bg-slate-100 px-3 sm:px-4 py-2 rounded-full border border-slate-200 hover:bg-slate-200 active:bg-slate-300 transition touch-manipulation">ログアウト</button>
+              </div>
+              
+              {/* 複数選択モード中の案内バー */}
+              {(isMultiSelectMode || selectedDates.length > 0) && (
+                <div className="mt-3 bg-blue-50 border-2 border-blue-300 rounded-lg p-3 flex flex-col sm:flex-row items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-blue-800 font-bold text-sm">
+                      {selectedDates.length > 0 
+                        ? `✅ ${selectedDates.length}日選択中` 
+                        : '日付をタップして選択してください'}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    {selectedDates.length > 0 && (
+                      <button
+                        onClick={handleMultiSelectComplete}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition text-sm touch-manipulation"
+                      >
+                        入力する
+                      </button>
+                    )}
+                    <button
+                      onClick={handleMultiSelectCancel}
+                      className="bg-slate-300 hover:bg-slate-400 text-slate-700 font-bold py-2 px-4 rounded-lg transition text-sm touch-manipulation"
+                    >
+                      キャンセル
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           </div>
@@ -709,13 +835,13 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8">
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-3 sm:p-6">
           <Calendar 
-            onChange={(val) => handleDateClick(val as Date)} 
             value={selectedDate} 
             activeStartDate={selectedDate} 
             onActiveStartDateChange={({ activeStartDate }) => activeStartDate && setSelectedDate(activeStartDate)} 
             locale="ja-JP" 
             tileContent={getTileContent} 
-            className="w-full border-none calendar-large" 
+            className="w-full border-none calendar-large"
+            tileDisabled={() => false} 
           />
         </div>
         
