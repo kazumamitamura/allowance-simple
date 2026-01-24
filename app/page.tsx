@@ -73,7 +73,8 @@ export default function Home() {
 
   const [activityId, setActivityId] = useState('')
   const [destinationId, setDestinationId] = useState('inside_short')
-  const [destinationDetail, setDestinationDetail] = useState('')
+  const [destinationDetail, setDestinationDetail] = useState('') // 目的地（運転時）
+  const [competitionName, setCompetitionName] = useState('') // 大会名（指定大会時）
   const [isDriving, setIsDriving] = useState(false)
   const [isAccommodation, setIsAccommodation] = useState(false)
   const [calculatedAmount, setCalculatedAmount] = useState(0)
@@ -369,7 +370,24 @@ export default function Home() {
         }
         
         setDestinationId(mappedDestinationId)
-        setDestinationDetail(allowance.destination_detail || '')
+        
+        // 指定大会の場合は大会名として扱う
+        if (allowance.activity_type.includes('C:') || allowance.activity_type.includes('指定大会')) {
+          const detail = allowance.destination_detail || ''
+          // 「大会名（目的地）」の形式で保存されている場合は分離
+          const match = detail.match(/^(.+?)（(.+?)）$/)
+          if (match && allowance.is_driving) {
+            setCompetitionName(match[1]) // 大会名
+            setDestinationDetail(match[2]) // 目的地
+          } else {
+            setCompetitionName(detail) // 大会名のみ
+            setDestinationDetail('') // 目的地はクリア
+          }
+        } else {
+          setDestinationDetail(allowance.destination_detail || '')
+          setCompetitionName('') // 大会名はクリア
+        }
+        
         setIsDriving(allowance.is_driving || false)
         setIsAccommodation(allowance.is_accommodation || false)
         // custom_amount と custom_description は、カラムが存在する場合のみ使用
@@ -379,6 +397,7 @@ export default function Home() {
         setActivityId('')
         setDestinationId('inside_short')
         setDestinationDetail('')
+        setCompetitionName('')
         setIsDriving(false)
         setIsAccommodation(false)
         setCustomAmount(0)
@@ -471,6 +490,21 @@ export default function Home() {
           console.error('削除エラー:', dateStr, deleteError)
         }
 
+        // destination_detailの決定
+        let detailValue = ''
+        if (activityId === 'CUSTOM') {
+          detailValue = customDescription
+        } else if (activityId === 'C') {
+          // 指定大会の場合：大会名と目的地を結合
+          if (isDriving && destinationDetail) {
+            detailValue = `${competitionName}（${destinationDetail}）`
+          } else {
+            detailValue = competitionName
+          }
+        } else {
+          detailValue = destinationDetail
+        }
+        
         // 新規データを挿入
         const insertData: any = { 
           user_id: user.id, 
@@ -478,7 +512,7 @@ export default function Home() {
           date: dateStr, 
           activity_type: ACTIVITY_TYPES.find(a => a.id === activityId)?.label || activityId, 
           destination_type: DESTINATIONS.find(d => d.id === destinationId)?.label, 
-          destination_detail: activityId === 'CUSTOM' ? customDescription : destinationDetail, 
+          destination_detail: detailValue, 
           is_driving: isDriving, 
           is_accommodation: isAccommodation, 
           amount: calculatedAmount
@@ -1028,7 +1062,9 @@ export default function Home() {
                             <div className="text-xs text-purple-500">※手入力その他の場合、内容と金額を必ず入力してください。</div>
                         </div>
                     ) : (
-                    <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div className="space-y-2 mt-2">
+                        {/* 行き先（区分）の選択 */}
+                        <div className="grid grid-cols-2 gap-2">
                             <div>
                                 <label className="block text-xs font-bold text-black mb-1">行き先（区分）</label>
                                 <select 
@@ -1041,20 +1077,51 @@ export default function Home() {
                                 </select>
                             </div>
                             
-                            {/* 運転ありの場合のみ目的地入力を表示 */}
-                            {isDriving && (
+                            {/* 指定大会の場合は大会名を入力 */}
+                            {activityId === 'C' && (
                                 <div>
-                                    <label className="block text-xs font-bold text-black mb-1">目的地</label>
+                                    <label className="block text-xs font-bold text-blue-700 mb-1">大会名 ✏️</label>
                                     <input 
                                         disabled={isAllowLocked} 
                                         type="text" 
-                                        placeholder="例: 県体育館" 
-                                        value={destinationDetail} 
-                                        onChange={(e) => setDestinationDetail(e.target.value)} 
-                                        className="w-full bg-white p-3 rounded-lg border border-slate-200 text-xs text-black font-bold" 
+                                        placeholder="例: 県高校総体" 
+                                        value={competitionName} 
+                                        onChange={(e) => setCompetitionName(e.target.value)} 
+                                        className="w-full bg-blue-50 p-3 rounded-lg border-2 border-blue-300 text-xs text-black font-bold" 
                                     />
                                 </div>
                             )}
+                        </div>
+                        
+                        {/* 指定大会 + 運転ありの場合は目的地も入力 */}
+                        {activityId === 'C' && isDriving && (
+                            <div>
+                                <label className="block text-xs font-bold text-green-700 mb-1">目的地（運転先） 🚗</label>
+                                <input 
+                                    disabled={isAllowLocked} 
+                                    type="text" 
+                                    placeholder="例: 県体育館" 
+                                    value={destinationDetail} 
+                                    onChange={(e) => setDestinationDetail(e.target.value)} 
+                                    className="w-full bg-green-50 p-3 rounded-lg border-2 border-green-300 text-xs text-black font-bold" 
+                                />
+                            </div>
+                        )}
+                        
+                        {/* 指定大会以外で運転ありの場合は目的地入力を表示 */}
+                        {activityId !== 'C' && isDriving && (
+                            <div>
+                                <label className="block text-xs font-bold text-green-700 mb-1">目的地（運転先） 🚗</label>
+                                <input 
+                                    disabled={isAllowLocked} 
+                                    type="text" 
+                                    placeholder="例: 県体育館" 
+                                    value={destinationDetail} 
+                                    onChange={(e) => setDestinationDetail(e.target.value)} 
+                                    className="w-full bg-green-50 p-3 rounded-lg border-2 border-green-300 text-xs text-black font-bold" 
+                                />
+                            </div>
+                        )}
                     </div>
                     )}
                     
