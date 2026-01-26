@@ -55,28 +55,61 @@ export async function uploadDocument(data: {
       .single()
 
     if (insertError) {
-      console.error('データベース保存エラー:', insertError)
+      console.error('データベース保存エラー（詳細）:', {
+        message: insertError.message,
+        code: insertError.code,
+        details: insertError.details,
+        hint: insertError.hint,
+        fullError: insertError
+      })
+      
       // Storageからファイルを削除（ロールバック）
       try {
         await supabase.storage.from('documents').remove([filePath])
       } catch (removeError) {
         console.error('Storage削除エラー（ロールバック）:', removeError)
       }
+      
       // テーブルが存在しない場合のエラーメッセージ（複数のパターンをチェック）
       const errorMessage = insertError.message || ''
       const errorCode = insertError.code || ''
+      const errorDetails = insertError.details || ''
+      const errorHint = insertError.hint || ''
       
-      if (
+      // スキーマキャッシュのエラー（PGRST205）の特別処理
+      const isSchemaCacheError = (
+        errorCode === 'PGRST205' ||
+        (errorMessage.includes('schema cache') && errorMessage.includes('Could not find'))
+      )
+      
+      // テーブルが存在しない場合
+      const isTableNotFound = (
         errorMessage.includes('does not exist') || 
         errorMessage.includes('schema cache') || 
         errorMessage.includes('relation') ||
         errorMessage.includes('table') ||
+        errorMessage.includes('documents') ||
         errorCode === '42P01' ||
-        errorCode === 'PGRST116'
-      ) {
-        return { error: 'データの保存に失敗しました: 資料テーブルが作成されていません。\n\nSETUP_INQUIRIES_AND_DOCUMENTS.sql を実行してください。\n\nエラー詳細: ' + errorMessage }
+        errorCode === 'PGRST116' ||
+        errorDetails.includes('documents') ||
+        errorHint.includes('documents')
+      )
+      
+      if (isSchemaCacheError) {
+        return { 
+          error: 'データの保存に失敗しました: スキーマキャッシュが更新されていません。\n\n【解決方法】\n1. Supabase Dashboard → Settings → API を開く\n2. "Reload schema cache" または "Refresh schema" ボタンをクリック\n3. 数秒待ってから再度お試しください\n\nまたは、以下のSQLを実行してください：\nSELECT COUNT(*) FROM documents;\n\nエラー詳細:\nメッセージ: ' + errorMessage + '\nコード: ' + errorCode 
+        }
       }
-      return { error: 'データの保存に失敗しました: ' + insertError.message }
+      
+      if (isTableNotFound) {
+        return { 
+          error: 'データの保存に失敗しました: 資料テーブルが作成されていません。\n\n【解決方法】\n1. Supabase Dashboard の SQL Editor を開く\n2. SETUP_INQUIRIES_AND_DOCUMENTS.sql の内容をコピー\n3. SQL Editor に貼り付けて実行\n\nエラー詳細:\nメッセージ: ' + errorMessage + '\nコード: ' + errorCode 
+        }
+      }
+      
+      return { 
+        error: 'データの保存に失敗しました: ' + errorMessage + (errorCode ? ' (コード: ' + errorCode + ')' : '') + '\n\n詳細: ' + (errorDetails || 'なし') + (errorHint ? '\nヒント: ' + errorHint : '')
+      }
     }
 
     return { success: true, documentId: document.id }

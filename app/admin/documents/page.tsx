@@ -114,16 +114,11 @@ export default function DocumentsAdminPage() {
       })
 
       if (result?.error) {
-        // より分かりやすいエラーメッセージ
-        let errorMessage = result.error
-        if (result.error.includes('Bucket not found')) {
-          errorMessage = 'Storageバケット「documents」が作成されていません。\n\nSupabase Dashboard で Storage バケットを作成してください。\n詳細は SETUP_INQUIRIES_AND_DOCUMENTS.md を参照してください。'
-        } else if (result.error.includes('does not exist') || result.error.includes('42P01')) {
-          errorMessage = '資料テーブルが作成されていません。\n\nSETUP_INQUIRIES_AND_DOCUMENTS.sql を実行してください。'
-        }
-        alert('アップロードに失敗しました: ' + errorMessage)
+        // エラーメッセージをそのまま表示（サーバー側で詳細なメッセージを生成済み）
+        alert('アップロードに失敗しました\n\n' + result.error)
       } else {
-        alert('アップロードが完了しました')
+        // 成功メッセージをより分かりやすく表示
+        alert('✅ アップロードが完了しました！\n\n資料が正常にアップロードされました。')
         setTitle('')
         setFile(null)
         // ファイル入力をリセット
@@ -251,7 +246,7 @@ export default function DocumentsAdminPage() {
             <button
               type="submit"
               disabled={uploading || !title.trim() || !file}
-              className="w-full py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:scale-[1.02] disabled:transform-none"
             >
               {uploading ? (
                 <>
@@ -262,7 +257,10 @@ export default function DocumentsAdminPage() {
                   <span>アップロード中...</span>
                 </>
               ) : (
-                <span>📤 アップロード</span>
+                <>
+                  <span className="text-lg">📤</span>
+                  <span>アップロード</span>
+                </>
               )}
             </button>
           </form>

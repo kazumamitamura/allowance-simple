@@ -826,9 +826,15 @@ export default function Home() {
                       {userName ? `👤 ${userName.length > 6 ? userName.substring(0, 6) + '...' : userName}` : '⚙️ 氏名登録'}
                   </button>
                   
-                  <a href="/documents" className="text-xs sm:text-sm font-bold text-blue-600 bg-blue-50 px-3 sm:px-4 py-2 rounded-full border-2 border-blue-300 hover:bg-blue-100 active:bg-blue-200 transition touch-manipulation whitespace-nowrap shadow-sm">📄 規約閲覧</a>
+                  <a href="/documents" className="text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-blue-500 to-blue-600 px-4 sm:px-5 py-2.5 rounded-lg border-2 border-blue-400 hover:from-blue-600 hover:to-blue-700 active:from-blue-700 active:to-blue-800 transition-all touch-manipulation whitespace-nowrap shadow-md hover:shadow-lg transform hover:scale-105 flex items-center gap-1.5">
+                    <span className="text-base">📄</span>
+                    <span>規約閲覧</span>
+                  </a>
                   
-                  <a href="/contact" className="text-xs sm:text-sm font-bold text-slate-600 bg-slate-100 px-3 sm:px-4 py-2 rounded-full border border-slate-200 hover:bg-slate-200 active:bg-slate-300 transition touch-manipulation whitespace-nowrap">📧 お問い合わせ</a>
+                  <a href="/contact" className="text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-purple-500 to-purple-600 px-4 sm:px-5 py-2.5 rounded-lg border-2 border-purple-400 hover:from-purple-600 hover:to-purple-700 active:from-purple-700 active:to-purple-800 transition-all touch-manipulation whitespace-nowrap shadow-md hover:shadow-lg transform hover:scale-105 flex items-center gap-1.5">
+                    <span className="text-base">📧</span>
+                    <span>お問い合わせ</span>
+                  </a>
                   
                   <button onClick={handleLogout} className="text-xs sm:text-sm font-bold text-slate-600 bg-slate-100 px-3 sm:px-4 py-2 rounded-full border border-slate-200 hover:bg-slate-200 active:bg-slate-300 transition touch-manipulation">ログアウト</button>
                 </div>
