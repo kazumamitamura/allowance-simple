@@ -168,33 +168,86 @@ export default function Home() {
           alert('姓と名の両方を入力してください')
           return
       }
+      if (!userId) {
+          alert('ユーザーIDが取得できませんでした。ページをリロードしてください。')
+          return
+      }
+      
       const fullName = `${inputLastName.trim()} ${inputFirstName.trim()}`
       
-      console.log('氏名保存開始:', { userId, fullName })
+      console.log('=== 氏名保存開始 ===')
+      console.log('User ID:', userId)
+      console.log('Full Name:', fullName)
+      console.log('User Email:', userEmail)
       
-      // display_name のみを更新
-      const { data, error } = await supabase
+      // まず、既存のレコードがあるか確認
+      const { data: existingProfile, error: checkError } = await supabase
         .from('user_profiles')
-        .update({ 
-          display_name: fullName
-      })
+        .select('*')
         .eq('user_id', userId)
-        .select()
+        .single()
+      
+      console.log('既存プロフィール確認:', { existingProfile, checkError })
+      
+      let result
+      let error
+      
+      if (existingProfile) {
+          // 既存レコードがある場合は更新
+          console.log('既存レコードを更新します')
+          result = await supabase
+            .from('user_profiles')
+            .update({ 
+              display_name: fullName,
+              email: userEmail || ''
+            })
+            .eq('user_id', userId)
+            .select()
+      } else {
+          // レコードが存在しない場合は挿入
+          console.log('新規レコードを挿入します')
+          result = await supabase
+            .from('user_profiles')
+            .insert({ 
+              user_id: userId,
+              email: userEmail || '',
+              display_name: fullName
+            })
+            .select()
+      }
+      
+      const { data, error: saveError } = result
+      error = saveError
 
       console.log('氏名保存結果:', { data, error })
 
       if (error) {
-          console.error('氏名登録エラー:', error)
-          alert('エラーが発生しました: ' + error.message)
+          console.error('氏名登録エラー（詳細）:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+            fullError: error
+          })
+          
+          // エラーメッセージを詳細に表示
+          let errorMessage = 'エラーが発生しました: ' + error.message
+          if (error.code === 'PGRST205' || error.message.includes('schema cache')) {
+              errorMessage += '\n\nスキーマキャッシュの問題の可能性があります。\n数秒待ってから再度お試しください。'
+          } else if (error.code === '42501' || error.message.includes('permission denied')) {
+              errorMessage += '\n\nアクセス権限の問題が発生しています。\n管理者にお問い合わせください。'
+          }
+          
+          alert(errorMessage)
       } else {
           console.log('氏名登録成功:', fullName)
           setUserName(fullName)
           setShowProfileModal(false)
           setInputLastName('')
           setInputFirstName('')
-          alert('氏名を登録しました！\n\nページをリロードして最新の情報を表示します。')
-          // ページをリロード
-          window.location.reload()
+          // プロフィールを再取得して確認
+          await fetchProfile(userId)
+          alert('氏名を登録しました！')
       }
   }
 
