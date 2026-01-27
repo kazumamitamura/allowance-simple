@@ -43,13 +43,41 @@ export default function DocumentsPage() {
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('文書取得エラー:', error)
-        // テーブルが存在しない場合のエラーメッセージ
-        if (error.message.includes('does not exist') || error.code === '42P01') {
+        console.error('文書取得エラー（詳細）:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          fullError: error
+        })
+        
+        const errorMessage = error.message || ''
+        const errorCode = error.code || ''
+        
+        // スキーマキャッシュのエラー（PGRST205）の特別処理
+        const isSchemaCacheError = (
+          errorCode === 'PGRST205' ||
+          (errorMessage.includes('schema cache') && errorMessage.includes('Could not find'))
+        )
+        
+        // テーブルが存在しない場合のエラー
+        const isTableNotFound = (
+          errorMessage.includes('does not exist') || 
+          errorMessage.includes('relation') ||
+          errorMessage.includes('table') ||
+          errorCode === '42P01' ||
+          errorCode === 'PGRST116'
+        )
+        
+        if (isSchemaCacheError) {
+          // スキーマキャッシュエラーの場合は、エラーを表示せず空の配列を設定（ユーザー体験を優先）
+          console.warn('資料テーブルのスキーマキャッシュが更新されていません。管理者に連絡してください。')
+        } else if (isTableNotFound) {
           // テーブルが存在しない場合は、エラーを表示せず空の配列を設定
           console.warn('資料テーブルが作成されていません')
         } else {
-          alert('文書の取得に失敗しました: ' + error.message)
+          // その他のエラーは表示
+          console.error('文書の取得に失敗しました:', errorMessage)
         }
         setDocuments([])
       } else {

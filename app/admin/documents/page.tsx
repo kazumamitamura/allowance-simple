@@ -59,22 +59,67 @@ export default function DocumentsAdminPage() {
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('文書取得エラー:', error)
-        // テーブルが存在しない場合のエラーメッセージ（複数のパターンをチェック）
+        console.error('文書取得エラー（詳細）:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          fullError: error
+        })
+        
         const errorMessage = error.message || ''
         const errorCode = error.code || ''
+        const errorDetails = error.details || ''
+        const errorHint = error.hint || ''
         
-        if (
+        // スキーマキャッシュのエラー（PGRST205）の特別処理
+        const isSchemaCacheError = (
+          errorCode === 'PGRST205' ||
+          (errorMessage.includes('schema cache') && errorMessage.includes('Could not find'))
+        )
+        
+        // テーブルが存在しない場合のエラー
+        const isTableNotFound = (
           errorMessage.includes('does not exist') || 
-          errorMessage.includes('schema cache') || 
           errorMessage.includes('relation') ||
           errorMessage.includes('table') ||
           errorCode === '42P01' ||
           errorCode === 'PGRST116'
-        ) {
-          alert('資料テーブルが作成されていません。\n\nSETUP_INQUIRIES_AND_DOCUMENTS.sql を実行してください。\n\nエラー詳細: ' + errorMessage)
+        )
+        
+        if (isSchemaCacheError) {
+          alert(
+            '資料テーブルの取得に失敗しました: スキーマキャッシュが更新されていません。\n\n' +
+            '【解決方法】\n' +
+            '1. Supabase Dashboard → Settings → API を開く\n' +
+            '2. "Reload schema cache" ボタンをクリック\n' +
+            '3. 数秒待ってから再度お試しください\n\n' +
+            'または、SQL Editor で以下を実行してください：\n' +
+            'NOTIFY pgrst, \'reload schema\';\n\n' +
+            'エラー詳細:\n' +
+            'コード: ' + errorCode + '\n' +
+            'メッセージ: ' + errorMessage
+          )
+        } else if (isTableNotFound) {
+          alert(
+            '資料テーブルが作成されていません。\n\n' +
+            '【解決方法】\n' +
+            '1. Supabase Dashboard の SQL Editor を開く\n' +
+            '2. SETUP_INQUIRIES_AND_DOCUMENTS.sql の内容をコピー\n' +
+            '3. SQL Editor に貼り付けて実行\n\n' +
+            'エラー詳細:\n' +
+            'コード: ' + errorCode + '\n' +
+            'メッセージ: ' + errorMessage
+          )
         } else {
-          alert('文書の取得に失敗しました: ' + errorMessage)
+          alert(
+            '文書の取得に失敗しました。\n\n' +
+            'エラー詳細:\n' +
+            'コード: ' + (errorCode || 'なし') + '\n' +
+            'メッセージ: ' + errorMessage + '\n' +
+            (errorDetails ? '詳細: ' + errorDetails + '\n' : '') +
+            (errorHint ? 'ヒント: ' + errorHint : '')
+          )
         }
         setDocuments([])
       } else {
