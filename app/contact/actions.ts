@@ -20,6 +20,13 @@ export async function submitInquiry(data: {
   }
 
   try {
+    // デバッグ: Supabase URL と環境変数を確認
+    console.log('=== 問い合わせ送信デバッグ情報 ===')
+    console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+    console.log('Supabase ANON_KEY (先頭20文字):', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 20) + '...')
+    console.log('User ID:', user.id)
+    console.log('User Email:', user.email)
+    
     // 問い合わせをデータベースに保存
     const { data: inquiry, error: insertError } = await supabase
       .from('inquiries')
@@ -40,7 +47,9 @@ export async function submitInquiry(data: {
         code: insertError.code,
         details: insertError.details,
         hint: insertError.hint,
-        fullError: insertError
+        fullError: insertError,
+        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        errorObject: JSON.stringify(insertError, null, 2)
       })
       
       // テーブルが存在しない場合のエラーメッセージ（複数のパターンをチェック）

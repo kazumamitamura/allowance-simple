@@ -17,13 +17,24 @@ export async function login(formData: FormData) {
 
   console.log('ログイン試行:', email)
 
+  // デバッグ: 環境変数を確認
+  console.log('=== ログイン試行デバッグ情報 ===')
+  console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+  console.log('Supabase ANON_KEY (先頭20文字):', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 20) + '...')
+  console.log('Email:', email)
+
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   })
 
   if (error) {
-    console.error('ログインエラー:', error.message, error.status)
+    console.error('ログインエラー（詳細）:', {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+      fullError: error
+    })
     
     // エラー内容に応じた詳細なメッセージ
     if (error.message.includes('Email not confirmed')) {
@@ -31,6 +42,11 @@ export async function login(formData: FormData) {
     }
     if (error.message.includes('Invalid login credentials')) {
       return { error: 'メールアドレスまたはパスワードが正しくありません。' }
+    }
+    if (error.message.includes('Invalid API key') || error.message.includes('JWT')) {
+      return { 
+        error: 'ログインに失敗しました: API キーが無効です。\n\n【解決方法】\n1. Vercel Dashboard → Settings → Environment Variables を開く\n2. NEXT_PUBLIC_SUPABASE_URL と NEXT_PUBLIC_SUPABASE_ANON_KEY が正しく設定されているか確認\n3. Supabase Dashboard → Settings → API で正しいキーをコピー\n4. Vercel を再デプロイ\n\nエラー詳細: ' + error.message
+      }
     }
     
     return { error: `ログインに失敗しました: ${error.message}` }
