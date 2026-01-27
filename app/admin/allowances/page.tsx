@@ -153,7 +153,7 @@ export default function AllowanceManagementPage() {
       logSupabaseError('申請承認/却下', error)
       const errorMessage = handleSupabaseError(error)
       alert('エラー:\n\n' + errorMessage)
-    else {
+    } else {
       alert(`${label}しました！`)
       fetchApprovalData()
     }
