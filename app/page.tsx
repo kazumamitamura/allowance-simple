@@ -38,6 +38,82 @@ const formatDate = (date: Date) => {
   return `${y}-${m}-${d}`
 }
 
+/**
+ * 日本の祝日を判定する関数
+ * @param date 判定する日付
+ * @returns 祝日名（祝日でない場合はnull）
+ */
+const getJapaneseHoliday = (date: Date): string | null => {
+  const year = date.getFullYear()
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  
+  // 固定祝日
+  if (month === 1 && day === 1) return '元日'
+  if (month === 1 && day === 2) return '振替休日' // 元日が日曜の場合
+  if (month === 1 && day === 3) return '振替休日' // 元日が土曜の場合
+  if (month === 2 && day === 11) return '建国記念の日'
+  if (month === 2 && day === 23) return '天皇誕生日'
+  if (month === 2 && day === 24) return '振替休日' // 天皇誕生日が日曜の場合
+  if (month === 4 && day === 29) return '昭和の日'
+  if (month === 5 && day === 3) return '憲法記念日'
+  if (month === 5 && day === 4) return 'みどりの日'
+  if (month === 5 && day === 5) return 'こどもの日'
+  if (month === 8 && day === 11) return '山の日'
+  if (month === 8 && day === 12) return '振替休日' // 山の日が日曜の場合
+  if (month === 11 && day === 3) return '文化の日'
+  if (month === 11 && day === 23) return '勤労感謝の日'
+  
+  // 変動祝日（春分の日・秋分の日）
+  // 春分の日の計算式（2000年〜2099年）
+  if (month === 3) {
+    const springEquinox = Math.floor(20.8431 + 0.242194 * (year - 1980)) - Math.floor((year - 1980) / 4)
+    if (day === springEquinox) return '春分の日'
+  }
+  
+  // 秋分の日の計算式（2000年〜2099年）
+  if (month === 9) {
+    const autumnEquinox = Math.floor(23.2488 + 0.242194 * (year - 1980)) - Math.floor((year - 1980) / 4)
+    if (day === autumnEquinox) return '秋分の日'
+  }
+  
+  // 成人の日（1月の第2月曜日）
+  if (month === 1) {
+    const firstMonday = (8 - new Date(year, 0, 1).getDay()) % 7 || 7
+    const adultDay = firstMonday + 7
+    if (day === adultDay) return '成人の日'
+  }
+  
+  // 海の日（7月の第3月曜日、2023年以降は固定7月17日）
+  if (month === 7) {
+    if (year >= 2023 && day === 17) {
+      return '海の日'
+    } else if (year < 2023) {
+      const firstMonday = (8 - new Date(year, 6, 1).getDay()) % 7 || 7
+      const marineDay = firstMonday + 14
+      if (day === marineDay) return '海の日'
+    }
+  }
+  
+  // 敬老の日（9月の第3月曜日）
+  if (month === 9) {
+    const firstMonday = (8 - new Date(year, 8, 1).getDay()) % 7 || 7
+    const respectDay = firstMonday + 14
+    if (day === respectDay) return '敬老の日'
+  }
+  
+  // スポーツの日（10月の第2月曜日、2020年は7月24日、2021年は7月23日）
+  if (month === 10) {
+    if (year === 2020 && day === 24) return 'スポーツの日'
+    if (year === 2021 && day === 23) return 'スポーツの日'
+    const firstMonday = (8 - new Date(year, 9, 1).getDay()) % 7 || 7
+    const sportsDay = firstMonday + 7
+    if (day === sportsDay) return 'スポーツの日'
+  }
+  
+  return null
+}
+
 export default function Home() {
   const router = useRouter()
   const supabase = createClient()
@@ -413,6 +489,10 @@ export default function Home() {
       const dayOfWeek = selectedDate.getDay()
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
       
+      // 日本の祝日を判定
+      const holidayName = getJapaneseHoliday(selectedDate)
+      const isHoliday = holidayName !== null
+      
       if (annualSchedule) {
         // work_typeに基づいてday_typeを決定
         const workType = annualSchedule.work_type.toUpperCase()
@@ -421,8 +501,8 @@ export default function Home() {
         } else if (workType === '休' || workType === '祝') {
           type = '休日'
         } else {
-          // work_typeが不明な場合、週末は休日、平日は勤務日
-          type = isWeekend ? '休日' : '勤務日'
+          // work_typeが不明な場合、祝日または週末は休日、平日は勤務日
+          type = (isHoliday || isWeekend) ? '休日' : '勤務日'
         }
         
         // 行事名がある場合は追加
@@ -434,9 +514,17 @@ export default function Home() {
         const calData = schoolCalendar.find(c => c.date === dateStr)
         if (calData) {
           type = calData.day_type
+          // schoolCalendarにデータがあっても、祝日判定を優先
+          if (isHoliday && !calData.day_type.includes('休日')) {
+            type = `休日(${holidayName})`
+          }
         } else {
-          // どちらもない場合、週末は休日、平日は勤務日
-          type = isWeekend ? '休日(仮)' : '勤務日(仮)'
+          // どちらもない場合、祝日または週末は休日、平日は勤務日
+          if (isHoliday) {
+            type = `休日(${holidayName})`
+          } else {
+            type = isWeekend ? '休日(仮)' : '勤務日(仮)'
+          }
         }
       }
       
