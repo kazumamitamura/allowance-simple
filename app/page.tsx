@@ -760,15 +760,36 @@ export default function Home() {
             } : null
           })
           
+          // 成功した場合はループを抜ける
+          if (!insertError) {
+            break
+          }
+          
+          // 404エラーやテーブルが見つからないエラー（PGRST116、またはPGRST205で「Could not find the table」が含まれる場合）の場合はリトライしない
+          const isTableNotFound = insertError.code === 'PGRST116' || 
+              insertError.message?.includes('404') || 
+              insertError.message?.includes('not found') ||
+              insertError.message?.includes('Could not find the table')
+          
+          if (isTableNotFound) {
+            console.error('⚠️ テーブルが見つかりません。リトライをスキップします。')
+            break
+          }
+          
           // スキーマキャッシュエラー（PGRST205）の場合はリトライ
-          if (insertError && (insertError.code === 'PGRST205' || insertError.message?.includes('schema cache'))) {
+          // ただし、「Could not find the table」が含まれている場合はテーブルが存在しない可能性が高いのでスキップ
+          if ((insertError.code === 'PGRST205' || insertError.message?.includes('schema cache')) && 
+              !insertError.message?.includes('Could not find the table')) {
             if (attempt < maxRetries) {
               console.warn(`スキーマキャッシュエラー検出 (試行 ${attempt}/${maxRetries})。${retryDelay}ms待機して再試行します...`)
               await new Promise(resolve => setTimeout(resolve, retryDelay))
               continue
+            } else {
+              // 3回リトライしても解決しない場合は、テーブルが存在しない可能性が高い
+              console.error('⚠️ スキーマキャッシュエラーが3回続けて発生しました。テーブルが存在しない可能性があります。')
             }
           } else {
-            // スキーマキャッシュエラー以外、または成功した場合はループを抜ける
+            // その他のエラーの場合はループを抜ける
             break
           }
         }
@@ -786,9 +807,13 @@ export default function Home() {
           logSupabaseError(`手当データ保存 (${dateStr})`, insertError)
           const errorMessage = handleSupabaseError(insertError)
           
-          // 404エラーの場合は追加情報を表示
-          if (insertError.code === 'PGRST116' || insertError.message?.includes('404') || insertError.message?.includes('not found')) {
-            alert(`${dateStr} の保存に失敗しました:\n\n${errorMessage}\n\n【追加情報】\nテーブル 'allowances' が見つかりません。\nSupabaseの設定を確認してください。`)
+          // テーブルが見つからないエラーの場合は追加情報を表示
+          if (insertError.code === 'PGRST116' || 
+              insertError.code === 'PGRST205' ||
+              insertError.message?.includes('404') || 
+              insertError.message?.includes('not found') ||
+              insertError.message?.includes('Could not find the table')) {
+            alert(`${dateStr} の保存に失敗しました:\n\n${errorMessage}\n\n【重要】\nテーブル 'allowances' がSupabaseに存在しないか、スキーマキャッシュが更新されていません。\n\n【解決方法】\n1. Supabaseダッシュボードでテーブル 'allowances' が作成されているか確認してください\n2. テーブルが存在する場合、Supabaseのスキーマキャッシュをリフレッシュしてください\n3. RLSポリシーが正しく設定されているか確認してください\n4. それでも解決しない場合は、管理者にお問い合わせください`)
           } else {
             alert(`${dateStr} の保存に失敗しました:\n\n${errorMessage}`)
           }
@@ -811,20 +836,43 @@ export default function Home() {
           const result = await supabase.from('allowances').delete().eq('user_id', user.id).eq('date', dateStr)
           deleteError = result.error
           
+          // 成功した場合はループを抜ける
+          if (!deleteError) {
+            break
+          }
+          
+          // 404エラーやテーブルが見つからないエラー（PGRST116、またはPGRST205で「Could not find the table」が含まれる場合）の場合はリトライしない
+          const isTableNotFound = deleteError.code === 'PGRST116' || 
+              deleteError.message?.includes('404') || 
+              deleteError.message?.includes('not found') ||
+              deleteError.message?.includes('Could not find the table')
+          
+          if (isTableNotFound) {
+            console.warn('⚠️ テーブルが見つかりません。削除処理をスキップします。')
+            break
+          }
+          
           // スキーマキャッシュエラー（PGRST205）の場合はリトライ
-          if (deleteError && (deleteError.code === 'PGRST205' || deleteError.message?.includes('schema cache'))) {
+          // ただし、「Could not find the table」が含まれている場合はテーブルが存在しない可能性が高いのでスキップ
+          if ((deleteError.code === 'PGRST205' || deleteError.message?.includes('schema cache')) && 
+              !deleteError.message?.includes('Could not find the table')) {
             if (attempt < maxRetries) {
               console.warn(`スキーマキャッシュエラー検出 (試行 ${attempt}/${maxRetries})。${retryDelay}ms待機して再試行します...`)
               await new Promise(resolve => setTimeout(resolve, retryDelay))
               continue
             }
           } else {
-            // スキーマキャッシュエラー以外、または成功した場合はループを抜ける
+            // その他のエラーの場合はループを抜ける
             break
           }
         }
         
-        if (deleteError && deleteError.code !== 'PGRST205') {
+        // 404エラーやテーブルが見つからないエラー以外のエラーのみログに出力
+        if (deleteError && 
+            deleteError.code !== 'PGRST205' && 
+            deleteError.code !== 'PGRST116' &&
+            !deleteError.message?.includes('404') &&
+            !deleteError.message?.includes('not found')) {
           console.error('削除エラー:', dateStr, deleteError)
         }
       }
