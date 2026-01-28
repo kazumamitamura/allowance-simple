@@ -821,6 +821,9 @@ export default function Home() {
     // 複数選択モード（PC: Ctrl/Cmd押下、スマホ: 複数選択モード有効）
     const isMultiSelect = isMultiSelectMode || event?.ctrlKey || event?.metaKey
     
+    // まず確実にselectedDateを更新
+    setSelectedDate(date)
+    
     if (isMultiSelect) {
       // 複数選択モード: 日付を配列に追加/削除（トグル）
       const dateStr = formatDate(date)
@@ -833,14 +836,8 @@ export default function Home() {
         // 未選択の場合は追加
         setSelectedDates([...selectedDates, date])
       }
-      
-      // 最初の日付を選択した場合、それをselectedDateにも設定
-      if (selectedDates.length === 0) {
-    setSelectedDate(date)
-      }
     } else {
       // 単一選択モード
-      setSelectedDate(date)
       setSelectedDates([]) // 複数選択をクリア
       
       // ロックチェック
@@ -848,7 +845,7 @@ export default function Home() {
         alert('⏰ 締め切り済みのため編集できません\n\n対象月の翌月10日までに入力・編集を完了してください。')
         return
       }
-    setShowInputModal(true)
+      setShowInputModal(true)
     }
   }
   
@@ -1118,15 +1115,23 @@ export default function Home() {
           <Calendar 
             value={selectedDate} 
             activeStartDate={selectedDate} 
-            onActiveStartDateChange={({ activeStartDate }) => {
-              // activeStartDateが変更された場合でも、selectedDateの日付を保持
-              if (activeStartDate) {
-                const currentDay = selectedDate.getDate()
-                const newDate = new Date(activeStartDate)
-                // 新しい月に同じ日付が存在する場合は保持、存在しない場合は1日に設定
-                const maxDay = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0).getDate()
-                newDate.setDate(Math.min(currentDay, maxDay))
-                setSelectedDate(newDate)
+            onActiveStartDateChange={({ activeStartDate, view }) => {
+              // 月表示が変更された場合のみ処理（日付クリック時には影響しない）
+              if (activeStartDate && view === 'month') {
+                const currentMonth = selectedDate.getMonth()
+                const currentYear = selectedDate.getFullYear()
+                const newMonth = activeStartDate.getMonth()
+                const newYear = activeStartDate.getFullYear()
+                
+                // 月が実際に変更された場合のみ処理
+                if (currentMonth !== newMonth || currentYear !== newYear) {
+                  const currentDay = selectedDate.getDate()
+                  const newDate = new Date(activeStartDate)
+                  // 新しい月に同じ日付が存在する場合は保持、存在しない場合は1日に設定
+                  const maxDay = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0).getDate()
+                  newDate.setDate(Math.min(currentDay, maxDay))
+                  setSelectedDate(newDate)
+                }
               }
             }} 
             locale="ja-JP" 
