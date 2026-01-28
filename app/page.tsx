@@ -409,15 +409,20 @@ export default function Home() {
       const annualSchedule = annualSchedules.find(s => s.date === dateStr)
       let type = ''
       
+      // 土曜日（6）と日曜日（0）を休日として判定
+      const dayOfWeek = selectedDate.getDay()
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+      
       if (annualSchedule) {
         // work_typeに基づいてday_typeを決定
         const workType = annualSchedule.work_type.toUpperCase()
-        if (workType === 'A' || workType === 'B') {
+        if (workType === 'A' || workType === 'B' || workType === 'C') {
           type = '勤務日'
         } else if (workType === '休' || workType === '祝') {
           type = '休日'
         } else {
-          type = '勤務日' // デフォルト
+          // work_typeが不明な場合、週末は休日、平日は勤務日
+          type = isWeekend ? '休日' : '勤務日'
         }
         
         // 行事名がある場合は追加
@@ -427,7 +432,12 @@ export default function Home() {
       } else {
         // annual_schedulesがない場合はschoolCalendarを使用
         const calData = schoolCalendar.find(c => c.date === dateStr)
-        type = calData?.day_type || (selectedDate.getDay() % 6 === 0 ? '休日(仮)' : '勤務日(仮)')
+        if (calData) {
+          type = calData.day_type
+        } else {
+          // どちらもない場合、週末は休日、平日は勤務日
+          type = isWeekend ? '休日(仮)' : '勤務日(仮)'
+        }
       }
       
       setDayType(type)
@@ -495,7 +505,8 @@ export default function Home() {
     console.log('isAccommodation:', isAccommodation)
     console.log('allowanceTypes件数:', allowanceTypes.length)
     
-    const isWorkDay = dayType.includes('勤務日') || dayType.includes('授業')
+    // 休日判定: dayTypeに'休日'が含まれる場合は休日、それ以外は勤務日
+    const isWorkDay = !dayType.includes('休日') && (dayType.includes('勤務日') || dayType.includes('授業'))
     console.log('勤務日判定:', isWorkDay)
     
     if (!activityId) { 
@@ -1082,7 +1093,8 @@ export default function Home() {
                     value={activityId} 
                     onChange={(e) => {
                         const newActivityId = e.target.value
-                        const isWorkDay = dayType.includes('勤務日') || dayType.includes('授業')
+                        // 休日判定: dayTypeに'休日'が含まれる場合は休日、それ以外は勤務日
+                        const isWorkDay = !dayType.includes('休日') && (dayType.includes('勤務日') || dayType.includes('授業'))
                         const validation = canSelectActivity(newActivityId, isWorkDay)
                         if (!validation.allowed) {
                             alert(validation.message)
@@ -1096,7 +1108,8 @@ export default function Home() {
                 >
                     <option value="">なし (部活なし)</option>
                     {ACTIVITY_TYPES.map(type => {
-                        const isWorkDay = dayType.includes('勤務日') || dayType.includes('授業')
+                        // 休日判定: dayTypeに'休日'が含まれる場合は休日、それ以外は勤務日
+                        const isWorkDay = !dayType.includes('休日') && (dayType.includes('勤務日') || dayType.includes('授業'))
                         const validation = canSelectActivity(type.id, isWorkDay)
                         return (
                             <option 
@@ -1110,7 +1123,8 @@ export default function Home() {
                     })}
                 </select>
                 {activityId && (() => {
-                    const isWorkDay = dayType.includes('勤務日') || dayType.includes('授業')
+                    // 休日判定: dayTypeに'休日'が含まれる場合は休日、それ以外は勤務日
+                    const isWorkDay = !dayType.includes('休日') && (dayType.includes('勤務日') || dayType.includes('授業'))
                     const validation = canSelectActivity(activityId, isWorkDay)
                     if (!validation.allowed) {
                         return <div className="text-xs text-red-600 mt-1 font-bold">⚠️ {validation.message}</div>
@@ -1278,7 +1292,8 @@ export default function Home() {
                         </div>
                         <div className="text-xs sm:text-sm text-slate-700 font-bold bg-white p-3 rounded-lg border border-blue-200">
                             {(() => {
-                                const isWorkDay = dayType.includes('勤務日') || dayType.includes('授業')
+                                // 休日判定: dayTypeに'休日'が含まれる場合は休日、それ以外は勤務日
+                                const isWorkDay = !dayType.includes('休日') && (dayType.includes('勤務日') || dayType.includes('授業'))
                                 
                                 // 運転ありの場合の最優先ルール
                                 if (isDriving) {

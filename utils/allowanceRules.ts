@@ -301,10 +301,17 @@ export const canSelectActivity = (
     const activity = ACTIVITY_TYPES.find(a => a.id === activityId)
     if (!activity) return { allowed: true }
     
-    if (activity.requiresHoliday && isWorkDay) {
-        return { 
-            allowed: false, 
-            message: `${activity.label}は休日のみ選択可能です。勤務日には選択できません。` 
+    // A（休日部活1日）とB（休日部活半日）は休日のみ選択可能
+    // ただし、isWorkDayがfalse（休日）の場合は選択可能
+    if (activity.requiresHoliday) {
+        if (isWorkDay) {
+            return { 
+                allowed: false, 
+                message: `${activity.label}は休日のみ選択可能です。勤務日には選択できません。` 
+            }
+        } else {
+            // 休日の場合は選択可能
+            return { allowed: true }
         }
     }
     
