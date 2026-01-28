@@ -74,6 +74,23 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 ⚠️ **必須**: [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) の手順を実行してください
 
+### 4-1. テーブルの作成
+
+⚠️ **重要**: 以下のテーブルがSupabaseに存在しない場合、アプリケーションが正常に動作しません。
+
+1. Supabaseダッシュボード → SQL Editor を開く
+2. `CREATE_ALL_TABLES.sql` ファイルの内容をコピーして実行
+3. テーブルが正常に作成されたことを確認
+4. 数秒待ってからアプリケーションをリロード（スキーマキャッシュの更新を待つ）
+
+**作成されるテーブル:**
+- `allowances` - 手当データ
+- `monthly_applications` - 月次申請データ
+
+**個別に作成する場合:**
+- `CREATE_ALLOWANCES_TABLE.sql` - allowancesテーブルのみ作成
+- `CREATE_MONTHLY_APPLICATIONS_TABLE.sql` - monthly_applicationsテーブルのみ作成
+
 ### 5. 開発サーバーを起動
 
 ```bash
