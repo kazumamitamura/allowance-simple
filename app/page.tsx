@@ -1196,76 +1196,66 @@ export default function Home() {
                   <button onClick={handleLogout} className="text-xs sm:text-sm font-bold text-slate-600 bg-slate-100 px-3 sm:px-4 py-2 rounded-full border border-slate-200 hover:bg-slate-200 active:bg-slate-300 transition touch-manipulation">ログアウト</button>
                 </div>
                 
-                {/* 複数選択モードボタン（大きく表示） */}
+                {/* 複数選択モードボタン（通常サイズ） */}
                 <button
                   onClick={() => setIsMultiSelectMode(!isMultiSelectMode)}
-                  className={`text-sm font-bold px-4 py-2 rounded-full border-2 transition touch-manipulation shadow-md ${
+                  className={`text-sm font-bold px-4 py-2 rounded-full border-2 transition touch-manipulation shadow-md whitespace-nowrap ${
                     isMultiSelectMode 
                       ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700 shadow-blue-300' 
                       : 'bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border-blue-300 hover:from-blue-100 hover:to-blue-200'
                   }`}
                 >
-                  {isMultiSelectMode ? '✅ 選択モード中（タップで選択/解除）' : '📅 複数日まとめて入力'}
+                  {isMultiSelectMode ? '✅ 選択モード中' : '📅 複数日まとめて入力'}
                 </button>
               </div>
-              
-              {/* 複数選択モード中の案内バー */}
-              {(isMultiSelectMode || selectedDates.length > 0) && (
-                <div className="mt-3 bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-400 rounded-xl p-4 shadow-lg">
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                        <span className="text-2xl">📅</span>
-                        <div>
-                          <span className="text-blue-900 font-extrabold text-lg block">
-                            {selectedDates.length > 0 
-                              ? `${selectedDates.length}日選択中` 
-                              : 'カレンダーから日付を選択'}
-                          </span>
-                          <span className="text-blue-700 text-xs">
-                            {selectedDates.length > 0 
-                              ? '内容を入力してまとめて保存できます' 
-                              : 'タップするたびに選択/解除できます'}
-                          </span>
-              </div>
-                      </div>
-                      <button
-                        onClick={handleMultiSelectCancel}
-                        className="bg-slate-400 hover:bg-slate-500 text-white font-bold py-2 px-3 rounded-lg transition text-sm touch-manipulation"
-                      >
-                        ✕
-              </button>
-            </div>
-                    
-                    {/* 選択された日付のリスト */}
-                    {selectedDates.length > 0 && (
-                      <div className="bg-white rounded-lg p-3 border border-blue-200">
-                        <div className="text-xs text-blue-700 font-bold mb-2">選択した日付:</div>
-                        <div className="flex flex-wrap gap-1">
-                          {selectedDates.map((date, index) => (
-                            <span key={index} className="text-xs px-2 py-1 rounded-full font-bold bg-blue-600 text-white">
-                              {date.getMonth() + 1}/{date.getDate()}
-                            </span>
-                          ))}
-          </div>
-                      </div>
-                    )}
-                    
-                    {selectedDates.length > 0 && (
-                      <button
-                        onClick={handleMultiSelectComplete}
-                        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-6 rounded-xl transition shadow-lg text-base touch-manipulation"
-                      >
-                        ✏️ 選択した{selectedDates.length}日分の内容を入力する
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* 複数選択モード中の案内バー（カレンダー直上・コンパクト表示） */}
+      {(isMultiSelectMode || selectedDates.length > 0) && (
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 pt-2 sm:pt-3">
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-300 rounded-lg px-3 py-2 sm:px-4 sm:py-2.5 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
+              <span className="text-blue-900 font-bold text-sm sm:text-base whitespace-nowrap">
+                {selectedDates.length > 0 ? `📅 ${selectedDates.length}日選択中` : '📅 カレンダーから日付をタップで選択/解除'}
+              </span>
+              {selectedDates.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {selectedDates.slice(0, 8).map((date, index) => (
+                    <span key={index} className="text-xs px-2 py-0.5 rounded-full font-bold bg-blue-600 text-white">
+                      {date.getMonth() + 1}/{date.getDate()}
+                    </span>
+                  ))}
+                  {selectedDates.length > 8 && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-slate-500 text-white">
+                      +{selectedDates.length - 8}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {selectedDates.length > 0 && (
+                <button
+                  onClick={handleMultiSelectComplete}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 sm:py-2 sm:px-4 rounded-lg transition text-xs sm:text-sm touch-manipulation whitespace-nowrap"
+                >
+                  ✏️ 内容を入力
+                </button>
+              )}
+              <button
+                onClick={handleMultiSelectCancel}
+                className="bg-slate-400 hover:bg-slate-500 text-white font-bold py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-lg transition text-xs sm:text-sm touch-manipulation"
+                title="選択モードを解除"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* メインカレンダー表示 */}
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8">
