@@ -64,6 +64,8 @@ export default function ExportPage() {
 
     setLoading(true)
     const yearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
+    const lastDay = new Date(selectedYear, selectedMonth, 0).getDate()
+    const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`
     
     // データ取得
     const { data: allowances } = await supabase
@@ -71,7 +73,7 @@ export default function ExportPage() {
       .select('*')
       .eq('user_id', selectedUser)
       .gte('date', `${yearMonth}-01`)
-      .lte('date', `${yearMonth}-31`)
+      .lte('date', endDate)
       .order('date', { ascending: true })
 
     const user = users.find(u => u.email === selectedUser)
@@ -222,13 +224,15 @@ export default function ExportPage() {
   const exportAllMonthly = async () => {
     setLoading(true)
     const yearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
+    const lastDay = new Date(selectedYear, selectedMonth, 0).getDate()
+    const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`
     
     // データ取得
     const { data: allowances } = await supabase
       .from('allowances')
       .select('*')
       .gte('date', `${yearMonth}-01`)
-      .lte('date', `${yearMonth}-31`)
+      .lte('date', endDate)
       .order('user_email')
 
     // ユーザー別集計

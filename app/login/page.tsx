@@ -71,7 +71,7 @@ export default function LoginPage() {
           {/* エラーメッセージ */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg">
-              <p className="text-sm text-red-700 font-bold">{error}</p>
+              <p className="text-sm text-red-700 font-bold whitespace-pre-line">{error}</p>
             </div>
           )}
 

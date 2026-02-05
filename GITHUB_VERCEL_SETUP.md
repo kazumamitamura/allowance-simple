@@ -12,11 +12,14 @@
 ### 初回または変更を反映するとき
 
 ```bash
-# プロジェクトフォルダで実行
+# プロジェクトフォルダ（allowance-only-app）で実行
 git add .
-git commit -m "操作マニュアル・検索機能・GitHub/Vercel連携"
-git push -u origin main
+git commit -m "signup fix, preview month end date fix, profiles SQL docs"
+git push origin main
 ```
+
+- すでに `origin` を設定済みの場合は `git push origin main` だけでOKです。
+- 初回プッシュ時は `git push -u origin main` で upstream を設定すると便利です。
 
 - GitHub にログインしていない場合は、ブラウザまたは Git Credential Manager で認証します。
 - リポジトリがまだない場合は [GitHub で New repository](https://github.com/new) を作成し、表示される手順の「push an existing repository」で上記の `git remote add` と `git push` を実行します。

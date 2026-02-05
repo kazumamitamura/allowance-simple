@@ -110,12 +110,15 @@ export default function AllowanceManagementPage() {
     if (appData) {
       const detailsMap: Record<string, Allowance[]> = {}
       for (const app of appData) {
+        const [y, m] = app.year_month.split('-').map(Number)
+        const lastDay = new Date(y, m, 0).getDate()
+        const endDate = `${app.year_month}-${String(lastDay).padStart(2, '0')}`
         const { data: allowData } = await supabase
           .from('allowances')
           .select('date, activity_type, amount, destination_type, destination_detail')
           .eq('user_id', app.user_id)
           .gte('date', `${app.year_month}-01`)
-          .lte('date', `${app.year_month}-31`)
+          .lte('date', endDate)
           .order('date')
         
         detailsMap[`${app.user_id}_${app.year_month}`] = allowData || []
@@ -173,13 +176,15 @@ export default function AllowanceManagementPage() {
 
     setExporting(true)
     const yearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
+    const lastDay = new Date(selectedYear, selectedMonth, 0).getDate()
+    const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`
     
     const { data: allowances } = await supabase
       .from('allowances')
       .select('*')
       .eq('user_email', selectedUser)
       .gte('date', `${yearMonth}-01`)
-      .lte('date', `${yearMonth}-31`)
+      .lte('date', endDate)
       .order('date')
 
     const user = users.find(u => u.email === selectedUser)
@@ -265,12 +270,14 @@ export default function AllowanceManagementPage() {
   const exportAllMonthly = async () => {
     setExporting(true)
     const yearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
+    const lastDay = new Date(selectedYear, selectedMonth, 0).getDate()
+    const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`
     
     const { data: allowances } = await supabase
       .from('allowances')
       .select('*')
       .gte('date', `${yearMonth}-01`)
-      .lte('date', `${yearMonth}-31`)
+      .lte('date', endDate)
       .order('user_email')
 
     const userTotals: Record<string, { name: string, count: number, amount: number }> = {}

@@ -82,12 +82,14 @@ export default function AllowancePreviewPage() {
   const fetchData = async () => {
     setLoading(true)
     const yearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
+    const lastDay = new Date(selectedYear, selectedMonth, 0).getDate()
+    const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`
     
     let query = supabase
       .from('allowances')
       .select('*')
       .gte('date', `${yearMonth}-01`)
-      .lte('date', `${yearMonth}-31`)
+      .lte('date', endDate)
     
     // 個別ユーザーが選択されている場合はフィルター
     if (selectedUser) {

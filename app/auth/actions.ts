@@ -90,12 +90,15 @@ export async function signup(formData: FormData) {
 
   console.log('新規登録試行:', email)
 
-  // Supabase認証での新規登録
+  // Supabase認証での新規登録（トリガー用に app_name / last_name / first_name を送信）
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: {
+        app_name: 'allowance',
+        last_name: lastName.trim(),
+        first_name: firstName.trim(),
         full_name: fullName,
       },
       emailRedirectTo: undefined, // メール確認リンクを無効化
@@ -134,6 +137,16 @@ export async function signup(formData: FormData) {
     }
     if (error.message.includes('Email')) {
       return { error: 'メールアドレスの形式が正しくありません。' }
+    }
+    // Database error saving new user → user_profiles 未作成 or トリガー不具合
+    if (error.message.includes('Database error saving new user')) {
+      return {
+        error: '登録に失敗しました: Database error saving new user\n\n' +
+          '【対処方法】\n' +
+          'Supabase で user_profiles テーブルとトリガーの設定が必要です。\n' +
+          'プロジェクトの「FIX_SIGNUP_USER_PROFILES.sql」を Supabase Dashboard → SQL Editor で実行してください。\n' +
+          '詳細は「SIGNUP_ERROR_FIX.md」を参照してください。'
+      }
     }
     
     return { error: `登録に失敗しました: ${error.message}` }
