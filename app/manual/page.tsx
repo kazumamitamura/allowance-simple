@@ -123,7 +123,7 @@ export default function ManualPage() {
           <hr className="border-slate-200 my-8" />
 
           {/* 2. ログイン */}
-          <ManualSection searchQuery={searchQuery} searchText="ログイン メール パスワード 手順 パスワードを忘れた URL 画面">
+          <ManualSection searchQuery={searchQuery} searchText="ログイン メール パスワード 手順 パスワードを忘れた URL 画面 新規登録 姓 名">
           <h3 className="text-lg font-bold text-gray-900 mt-8">2. ログイン</h3>
           <ManualImage fig={1} />
           <h4 className="text-base font-semibold text-gray-800 mt-4">2.1 ログイン画面の開き方</h4>
@@ -141,6 +141,22 @@ export default function ManualPage() {
             <li>ログイン画面の「パスワードを忘れた方」をクリックする</li>
             <li>案内に従い、登録メールアドレスに送られるリンクからパスワードを再設定する</li>
           </ul>
+          <h4 className="text-base font-semibold text-gray-800 mt-4">2.4 新規登録の手順</h4>
+          <p className="text-gray-700">初めて利用する方は、ログイン画面から新規登録を行います。</p>
+          <ol className="list-decimal pl-6 text-gray-700 space-y-2">
+            <li>アプリのログイン画面（<strong>/login</strong>）を開く</li>
+            <li>画面上部のタブで<strong>「新規登録」</strong>をクリックする</li>
+            <li>次の項目を入力する：
+              <ul className="list-disc pl-6 mt-1 space-y-0.5">
+                <li><strong>姓</strong>・<strong>名</strong>（帳票に表示される名前。例：姓「三田村」、名「和真」）</li>
+                <li><strong>メールアドレス</strong>（ログイン時に使用。学校などで使うアドレスを推奨）</li>
+                <li><strong>パスワード</strong>（6文字以上。忘れないようにメモしておいてください）</li>
+              </ul>
+            </li>
+            <li><strong>「新規登録してログイン」</strong>ボタンをクリックする</li>
+            <li>登録が完了すると、そのままカレンダー画面（トップ）に移動します。メール確認は不要です。</li>
+          </ol>
+          <p className="text-gray-700 text-sm mt-2">※すでに同じメールアドレスで登録済みの場合は、同じ画面の「ログイン」タブからログインしてください。</p>
           </ManualSection>
 
           <hr className="border-slate-200 my-8" />
@@ -302,14 +318,30 @@ export default function ManualPage() {
           <hr className="border-slate-200 my-8" />
 
           {/* 7. その他の機能 */}
-          <ManualSection searchQuery={searchQuery} searchText="氏名登録 規約閲覧 お問い合わせ 管理者 事務担当者 氏名 変更">
+          <ManualSection searchQuery={searchQuery} searchText="氏名登録 規約閲覧 お問い合わせ 管理者 事務担当者 氏名 変更 件名 メッセージ 送信">
           <h3 className="text-lg font-bold text-gray-900 mt-8">7. その他の機能</h3>
           <h4 className="text-base font-semibold text-gray-800 mt-4">7.1 氏名登録・変更</h4>
           <p className="text-gray-700">初回ログイン時や氏名未登録のときは<strong>氏名登録のモーダル</strong>が表示されます。トップ画面の<strong>「👤 氏名」</strong>（または「⚙️ 氏名登録」）をクリックすると登録・変更画面を開けます。姓と名を入力して保存すると、帳票などに使う表示名が登録されます。</p>
           <h4 className="text-base font-semibold text-gray-800 mt-4">7.2 規約閲覧</h4>
           <p className="text-gray-700"><strong>「規約閲覧」</strong>をクリックすると、手当に関する規約を確認できるページに移動します。</p>
-          <h4 className="text-base font-semibold text-gray-800 mt-4">7.3 お問い合わせ</h4>
-          <p className="text-gray-700"><strong>「お問い合わせ」</strong>をクリックすると、問い合わせ用のページに移動します。</p>
+          <h4 className="text-base font-semibold text-gray-800 mt-4">7.3 お問い合わせ（問い合わせ方法）</h4>
+          <p className="text-gray-700">システムの不具合や操作方法の質問などを、管理者に送信できます。</p>
+          <p className="text-gray-700 font-medium mt-2">開き方</p>
+          <p className="text-gray-700 text-sm">ログインした状態で、トップ画面の<strong>「お問い合わせ」</strong>をクリックすると、お問い合わせページに移動します。</p>
+          <p className="text-gray-700 font-medium mt-3">入力項目</p>
+          <ul className="list-disc pl-6 text-gray-700 space-y-1 text-sm">
+            <li><strong>件名</strong>（必須）…例：「手当の入力方法について」</li>
+            <li><strong>メッセージ</strong>（必須）…質問や報告内容を詳しく記入してください</li>
+          </ul>
+          <p className="text-gray-700 text-sm mt-2">送信者情報（氏名・メールアドレス）は、ログイン中のアカウントから自動で付きます。回答は登録されているメールアドレスに送られます。</p>
+          <p className="text-gray-700 font-medium mt-3">送信の流れ</p>
+          <ol className="list-decimal pl-6 text-gray-700 space-y-1 text-sm">
+            <li>件名とメッセージを入力する</li>
+            <li><strong>「📧 お問い合わせを送信」</strong>ボタンをクリックする</li>
+            <li>「お問い合わせを送信しました」と表示されれば完了。通常、1〜2営業日以内にメールで回答があります</li>
+            <li>数秒後に自動でメイン画面に戻ります（または「メイン画面に戻る」をクリック）</li>
+          </ol>
+          <p className="text-gray-700 text-sm mt-2">💡 エラーメッセージが出る場合は、その内容も件名やメッセージに含めると対応しやすくなります。</p>
           <h4 className="text-base font-semibold text-gray-800 mt-4">7.4 事務担当者（管理者）向けページ</h4>
           <p className="text-gray-700">管理者用メールアドレスでログインしている場合、画面上部に<strong>「事務担当者ページへ」</strong>のリンクが表示されます。クリックすると、承認・Excel出力・設定などの管理機能があるページに移動します。（一般ユーザー向けマニュアルでは、詳細は「管理者マニュアル」に任せてよいです）</p>
           </ManualSection>
