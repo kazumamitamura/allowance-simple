@@ -36,9 +36,9 @@ export async function login(formData: FormData) {
       fullError: error
     })
     
-    // エラー内容に応じた詳細なメッセージ
+    // エラー内容に応じた詳細なメッセージ（メール確認は本システムでは使用しない）
     if (error.message.includes('Email not confirmed')) {
-      return { error: 'メールアドレスが確認されていません。確認メールをご確認ください。' }
+      return { error: 'ログインできません。このプロジェクトでメール確認が有効になっています。\n\n管理者は Supabase Dashboard → Authentication → Providers → Email で「Confirm email」をオフにし、既存ユーザーには DISABLE_EMAIL_CONFIRMATION.md のSQLを実行してください。' }
     }
     if (error.message.includes('Invalid login credentials')) {
       return { error: 'メールアドレスまたはパスワードが正しくありません。' }
@@ -209,13 +209,9 @@ export async function signup(formData: FormData) {
       
       if (loginError) {
         console.error('自動ログイン失敗:', loginError.message)
-        
         if (loginError.message.includes('Email not confirmed')) {
-          return { 
-            error: '登録は完了しましたが、メールアドレスの確認が必要です。管理者にお問い合わせください。' 
-          }
+          return { error: '登録は完了しましたが、ログインできません。Supabase で「Confirm email」をオフにしてください。詳細は DISABLE_EMAIL_CONFIRMATION.md を参照してください。' }
         }
-        
         return { error: `登録は完了しましたが、ログインに失敗しました: ${loginError.message}` }
       }
       
