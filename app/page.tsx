@@ -206,11 +206,10 @@ export default function Home() {
     init()
   }, [])
 
-  // 氏名取得
+  // 氏名取得（新規登録で入力済みの場合はそのまま表示。モーダルは自動で開かない）
   const fetchProfile = async (uid: string) => {
       console.log('プロフィール取得開始:', uid)
       
-      // まず全カラムを取得してデバッグ
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -221,22 +220,14 @@ export default function Home() {
       
       if (error) {
         console.error('プロフィール取得エラー:', error)
-        // display_nameカラムが存在しない場合のフォールバック処理
-        setShowProfileModal(true) // 氏名登録モーダルを表示
+        setUserName('')
         return
       }
       
-      // display_name のみをチェック（full_nameカラムは存在しない）
-      const name = data?.display_name || ''
-      console.log('取得した氏名:', name)
-      
-      if (name) {
-        setUserName(name)
-      } else {
-        // 氏名が未登録の場合
-        console.warn('氏名が未登録です')
-        setShowProfileModal(true)
-      }
+      const name = (data?.display_name || '').trim()
+      console.log('取得した氏名:', name || '(未登録)')
+      setUserName(name)
+      // 氏名が空でもモーダルは自動表示しない。変更・登録は「アカウント」から行う
   }
 
   // 氏名保存処理
@@ -1105,19 +1096,16 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
        {isAdmin && <div className="bg-slate-800 text-white text-center py-3 text-sm font-bold shadow-md"><a href="/admin" className="underline hover:text-blue-300 transition">事務担当者ページへ</a></div>}
 
-      {/* 氏名未登録バナー */}
+      {/* 氏名未登録時のみ表示（登録はアカウントから） */}
       {!userName && (
-        <div className="bg-yellow-100 border-b-2 border-yellow-400 py-3 px-4">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-yellow-800 font-bold">⚠️ 氏名が未登録です</span>
-              <span className="text-sm text-yellow-700">帳票出力のため、氏名を登録してください。</span>
-            </div>
+        <div className="bg-amber-50 border-b border-amber-200 py-2 px-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+            <span className="text-amber-800 text-sm">帳票用の氏名が未登録です。</span>
             <button 
-              onClick={() => setShowProfileModal(true)} 
-              className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition"
+              onClick={() => { setInputLastName(''); setInputFirstName(''); setShowProfileModal(true); }} 
+              className="text-amber-800 font-bold text-sm underline hover:no-underline"
             >
-              今すぐ登録
+              アカウントで登録する
             </button>
           </div>
         </div>
@@ -1162,12 +1150,11 @@ export default function Home() {
                   {allowanceStatus === 'draft' && !isAllowLocked && <button onClick={handleSubmit} className="text-sm sm:text-base font-bold text-white bg-blue-600 px-5 sm:px-6 py-2.5 sm:py-3 rounded-full hover:bg-blue-700 active:bg-blue-800 shadow-md transition touch-manipulation w-full sm:w-auto">💰 手当申請</button>}
               </div>
               
-              {/* 氏名・複数選択・ログアウト - スマホでは横並び */}
+              {/* アカウント（氏名の変更・登録）・複数選択・ログアウト */}
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <div className="flex gap-2">
                   <button 
                       onClick={() => {
-                          // 既に氏名が登録されている場合は、現在の氏名を入力欄に分割して表示
                           if (userName) {
                               const nameParts = userName.split(' ')
                               setInputLastName(nameParts[0] || '')
@@ -1180,7 +1167,7 @@ export default function Home() {
                       }} 
                       className="text-xs sm:text-sm font-bold text-slate-600 bg-slate-100 px-3 sm:px-4 py-2 rounded-full border border-slate-200 hover:bg-slate-200 active:bg-slate-300 transition touch-manipulation flex-1 sm:flex-none whitespace-nowrap"
                   >
-                      {userName ? `👤 ${userName.length > 6 ? userName.substring(0, 6) + '...' : userName}` : '⚙️ 氏名登録'}
+                      {userName ? `👤 ${userName.length > 8 ? userName.substring(0, 8) + '…' : userName}` : '👤 アカウント'}
                   </button>
                   
                   <a href="/manual" className="text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 sm:px-5 py-2.5 rounded-lg border-2 border-emerald-400 hover:from-emerald-600 hover:to-emerald-700 active:from-emerald-700 active:to-emerald-800 transition-all touch-manipulation whitespace-nowrap shadow-md hover:shadow-lg transform hover:scale-105 flex items-center gap-1.5">
@@ -1650,10 +1637,7 @@ export default function Home() {
           <div 
               className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
               onClick={() => {
-                  // 既に氏名が登録されている場合は閉じられる
-                  if (userName) {
-                      setShowProfileModal(false)
-                  }
+                  if (userName) setShowProfileModal(false)
               }}
           >
               <div 
@@ -1673,21 +1657,12 @@ export default function Home() {
                   <div className="text-center mb-4">
                       <div className="text-5xl mb-2">👤</div>
                       <h3 className="text-2xl font-extrabold text-gray-900">
-                          {userName ? '氏名を変更' : '氏名登録が必要です'}
+                          {userName ? '氏名を変更' : '氏名を登録'}
                       </h3>
-                      </div>
+                  </div>
                   <p className="text-sm text-slate-600 mb-6 text-center">
-                      {userName ? (
-                          <>
-                              帳票出力に使用する氏名を変更できます。<br/>
-                              姓と名の間に半角スペースが自動で入ります。
-                          </>
-                      ) : (
-                          <>
-                              帳票出力に使用する氏名を登録してください。<br/>
-                              姓と名の間に半角スペースが自動で入ります。
-                          </>
-                      )}
+                      帳票出力に使用する氏名を{userName ? '変更' : '登録'}できます。<br/>
+                      姓と名の間に半角スペースが自動で入ります。
                   </p>
                   
                   {/* 現在の氏名表示（変更時のみ） */}
@@ -1721,27 +1696,28 @@ export default function Home() {
                       </div>
                   </div>
                   
-                  <div className="flex gap-3">
-                      {/* キャンセルボタン（既に氏名が登録されている場合のみ表示） */}
-                      {userName && (
+                  <div className="flex flex-col gap-3">
+                      <div className="flex gap-3">
+                          {userName && (
+                              <button 
+                                  onClick={() => { setShowProfileModal(false); setInputLastName(''); setInputFirstName(''); }}
+                                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-4 rounded-xl transition shadow-lg text-lg"
+                              >
+                                  キャンセル
+                              </button>
+                          )}
                           <button 
-                              onClick={() => {
-                                  setShowProfileModal(false)
-                                  setInputLastName('')
-                                  setInputFirstName('')
-                              }}
-                              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-4 rounded-xl transition shadow-lg text-lg"
+                              onClick={handleSaveProfile} 
+                              className={`${userName ? 'flex-1' : 'w-full'} bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 rounded-xl transition shadow-xl text-lg`}
                           >
-                              キャンセル
+                              💾 {userName ? '氏名を変更する' : '氏名を登録する'}
+                          </button>
+                      </div>
+                      {!userName && (
+                          <button onClick={() => setShowProfileModal(false)} className="text-sm text-slate-500 hover:text-slate-700 underline">
+                              あとでする
                           </button>
                       )}
-                      
-                      <button 
-                          onClick={handleSaveProfile} 
-                          className={`${userName ? 'flex-1' : 'w-full'} bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 rounded-xl transition shadow-xl text-lg`}
-                      >
-                          💾 {userName ? '氏名を変更する' : '氏名を登録する'}
-                      </button>
                   </div>
               </div>
           </div>

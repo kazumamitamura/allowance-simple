@@ -116,7 +116,7 @@ export default function ManualPage() {
           </ul>
           <h4 className="text-base font-semibold text-gray-800 mt-4">1.2 利用の流れ（概要）</h4>
           <p className="text-gray-700">
-            1. ログイン → 2. 氏名登録（初回のみ） → 3. カレンダーで日付を選んで手当を入力 → 4. 月末などに「手当申請」で申請
+            1. ログイン（新規登録時に氏名入力） → 2. カレンダーで日付を選んで手当を入力 → 3. 月末などに「手当申請」で申請。氏名の変更は「👤 アカウント」から
           </p>
           </ManualSection>
 
@@ -181,7 +181,7 @@ export default function ManualPage() {
                 <tr><td className="border border-slate-200 px-3 py-2">合宿：○日 / 遠征：○日</td><td className="border border-slate-200 px-3 py-2">その月の合宿・遠征の日数</td></tr>
                 <tr><td className="border border-slate-200 px-3 py-2">期限：翌月10日</td><td className="border border-slate-200 px-3 py-2">入力・編集できる期限（翌月10日まで）</td></tr>
                 <tr><td className="border border-slate-200 px-3 py-2">💰 手当申請</td><td className="border border-slate-200 px-3 py-2">その月の手当を「申請」するボタン（下書きのときだけ押せる）</td></tr>
-                <tr><td className="border border-slate-200 px-3 py-2">👤 氏名</td><td className="border border-slate-200 px-3 py-2">氏名の登録・変更（初回は「氏名登録」と表示）</td></tr>
+                <tr><td className="border border-slate-200 px-3 py-2">👤 アカウント</td><td className="border border-slate-200 px-3 py-2">氏名の登録・変更（新規登録時に入力した氏名は自動で登録されます）</td></tr>
                 <tr><td className="border border-slate-200 px-3 py-2">規約閲覧</td><td className="border border-slate-200 px-3 py-2">手当規約のページへ移動</td></tr>
                 <tr><td className="border border-slate-200 px-3 py-2">お問い合わせ</td><td className="border border-slate-200 px-3 py-2">問い合わせページへ移動</td></tr>
                 <tr><td className="border border-slate-200 px-3 py-2">ログアウト</td><td className="border border-slate-200 px-3 py-2">ログアウトする</td></tr>
@@ -320,8 +320,8 @@ export default function ManualPage() {
           {/* 7. その他の機能 */}
           <ManualSection searchQuery={searchQuery} searchText="氏名登録 規約閲覧 お問い合わせ 管理者 事務担当者 氏名 変更 件名 メッセージ 送信">
           <h3 className="text-lg font-bold text-gray-900 mt-8">7. その他の機能</h3>
-          <h4 className="text-base font-semibold text-gray-800 mt-4">7.1 氏名登録・変更</h4>
-          <p className="text-gray-700">初回ログイン時や氏名未登録のときは<strong>氏名登録のモーダル</strong>が表示されます。トップ画面の<strong>「👤 氏名」</strong>（または「⚙️ 氏名登録」）をクリックすると登録・変更画面を開けます。姓と名を入力して保存すると、帳票などに使う表示名が登録されます。</p>
+          <h4 className="text-base font-semibold text-gray-800 mt-4">7.1 氏名の登録・変更</h4>
+          <p className="text-gray-700">氏名は<strong>新規登録時</strong>に入力すると自動で登録されます。登録後はトップ画面の<strong>「👤 アカウント」</strong>（または氏名表示）をクリックすると、氏名の変更・登録画面を開けます。姓と名を入力して保存すると、帳票などに使う表示名が登録・更新されます。</p>
           <h4 className="text-base font-semibold text-gray-800 mt-4">7.2 規約閲覧</h4>
           <p className="text-gray-700"><strong>「規約閲覧」</strong>をクリックすると、手当に関する規約を確認できるページに移動します。</p>
           <h4 className="text-base font-semibold text-gray-800 mt-4">7.3 お問い合わせ（問い合わせ方法）</h4>
