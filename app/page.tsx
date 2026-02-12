@@ -160,14 +160,11 @@ export default function Home() {
 
   const getLockStatus = (targetDate: Date) => {
     if (isAdmin) return false
-    const now = new Date()
-    // 翌月10日23:59までは編集可能
-    const deadline = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 10, 23, 59, 59)
-    const isPastDeadline = now > deadline
     const currentViewMonth = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`
     const targetMonth = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`
     const isTargetMonth = currentViewMonth === targetMonth
-    return isPastDeadline || (isTargetMonth && allowanceStatus !== 'draft')
+    // 申請済み（申請中・承認済）の対象月のみ編集不可。翌月10日締め切り制限は廃止
+    return isTargetMonth && allowanceStatus !== 'draft'
   }
 
   const isAllowLocked = getLockStatus(selectedDate)
@@ -991,9 +988,9 @@ export default function Home() {
       // 単一選択モード
       setSelectedDates([]) // 複数選択をクリア
       
-      // ロックチェック
+      // ロックチェック（申請済みの対象月は編集不可）
       if (getLockStatus(date)) {
-        alert('⏰ 締め切り済みのため編集できません\n\n対象月の翌月10日までに入力・編集を完了してください。')
+        alert('この日付は申請済みのため編集できません。')
         return
       }
       setShowInputModal(true)
@@ -1007,10 +1004,10 @@ export default function Home() {
       return
     }
     
-    // ロックチェック（選択された日付のいずれかがロックされている場合）
+    // ロックチェック（選択された日付のいずれかが申請済みで編集不可の場合）
     const hasLockedDate = selectedDates.some(date => getLockStatus(date))
     if (hasLockedDate) {
-      alert('⏰ 選択した日付の中に締め切り済みのものが含まれています\n\n対象月の翌月10日までに入力・編集を完了してください。')
+      alert('選択した日付の中に申請済みのため編集できない日が含まれています。')
       return
     }
     
@@ -1127,11 +1124,6 @@ export default function Home() {
             
             {/* 右側: ボタン類 */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full lg:w-auto">
-              {/* 期限通知 - スマホでは非表示、タブレット以上で表示 */}
-              <div className="hidden md:block bg-red-50 border-2 border-red-300 px-3 py-2 rounded-lg">
-                <span className="text-red-700 font-bold text-xs lg:text-sm whitespace-nowrap">⚠️ 期限：翌月10日</span>
-              </div>
-              
               {/* 手当申請ステータス */}
               <div className="flex items-center gap-2 w-full sm:w-auto">
                   {allowanceStatus === 'approved' && <span className="bg-green-100 text-green-700 px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-bold w-full sm:w-auto text-center">💰 承認済</span>}

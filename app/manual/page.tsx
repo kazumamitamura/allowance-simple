@@ -179,7 +179,6 @@ export default function ManualPage() {
                 <tr><td className="border border-slate-200 px-3 py-2">‹ ○年○月 ›</td><td className="border border-slate-200 px-3 py-2">月の切り替え。‹で前月、›で次月。</td></tr>
                 <tr><td className="border border-slate-200 px-3 py-2">支給予定額 ¥○○○</td><td className="border border-slate-200 px-3 py-2">表示中の月の手当合計（自動計算）</td></tr>
                 <tr><td className="border border-slate-200 px-3 py-2">合宿：○日 / 遠征：○日</td><td className="border border-slate-200 px-3 py-2">その月の合宿・遠征の日数</td></tr>
-                <tr><td className="border border-slate-200 px-3 py-2">期限：翌月10日</td><td className="border border-slate-200 px-3 py-2">入力・編集できる期限（翌月10日まで）</td></tr>
                 <tr><td className="border border-slate-200 px-3 py-2">💰 手当申請</td><td className="border border-slate-200 px-3 py-2">その月の手当を「申請」するボタン（下書きのときだけ押せる）</td></tr>
                 <tr><td className="border border-slate-200 px-3 py-2">👤 アカウント</td><td className="border border-slate-200 px-3 py-2">氏名の登録・変更（新規登録時に入力した氏名は自動で登録されます）</td></tr>
                 <tr><td className="border border-slate-200 px-3 py-2">規約閲覧</td><td className="border border-slate-200 px-3 py-2">手当規約のページへ移動</td></tr>
@@ -201,7 +200,7 @@ export default function ManualPage() {
           <h4 className="text-base font-semibold text-gray-800 mt-4">3.3 手当履歴（画面下部）</h4>
           <ul className="list-disc pl-6 text-gray-700 space-y-1">
             <li>表示中の月に入力した手当が、日付・業務内容・金額の一覧で表示される</li>
-            <li>各行のゴミ箱アイコンで、その日付の手当を削除できる（申請前・期限内のみ）</li>
+            <li>各行のゴミ箱アイコンで、その日付の手当を削除できる（申請前のみ）</li>
           </ul>
           </ManualSection>
 
@@ -262,7 +261,7 @@ export default function ManualPage() {
             <li><strong>編集</strong>：同じ日付を再度クリックして入力画面を開き、内容を変えて保存する</li>
             <li><strong>削除</strong>：トップ画面下部の「○月の手当履歴」で、該当行のゴミ箱アイコンをクリックして削除する</li>
           </ul>
-          <p className="text-gray-700 text-sm">※申請済み・期限過ぎの月は編集・削除できません。</p>
+          <p className="text-gray-700 text-sm">※申請済みの月は編集・削除できません。</p>
           </ManualSection>
 
           <hr className="border-slate-200 my-8" />
@@ -284,7 +283,7 @@ export default function ManualPage() {
           <ManualImage fig={6} />
           <h4 className="text-base font-semibold text-gray-800 mt-4">5.2 注意点</h4>
           <ul className="list-disc pl-6 text-gray-700 space-y-1">
-            <li>選択した日の中に<strong>申請済み・期限過ぎ</strong>の日があると、「内容を入力」時に注意メッセージが出ます</li>
+            <li>選択した日の中に<strong>申請済み</strong>の日があると、「内容を入力」時に注意メッセージが出ます</li>
             <li>選択モードをやめるときは、案内バーの<strong>「✕」</strong>をクリックする</li>
           </ul>
           </ManualSection>
@@ -349,14 +348,14 @@ export default function ManualPage() {
           <hr className="border-slate-200 my-8" />
 
           {/* 8. よくある質問 */}
-          <ManualSection searchQuery={searchQuery} searchText="よくある質問 休日 選べない テーブル 期限 翌月10日 申請 差し戻し 複数日 変更 保存 エラー">
+          <ManualSection searchQuery={searchQuery} searchText="よくある質問 休日 選べない テーブル 期限 申請 差し戻し 複数日 変更 保存 エラー">
           <h3 className="text-lg font-bold text-gray-900 mt-8">8. よくある質問・注意事項</h3>
           <p className="text-gray-700 font-medium">Q1. 休日なのに「A:休日部活(1日)」が選べない</p>
           <p className="text-gray-700 text-sm">その日が<strong>休日として判定されているか</strong>を確認してください。土日・祝日は自動で休日になります。年間予定で「勤務日」になっている日は休日扱いになりません。</p>
           <p className="text-gray-700 font-medium mt-3">Q2. 保存すると「テーブルが見つかりません」と出る</p>
           <p className="text-gray-700 text-sm">データベース（Supabase）に<strong>allowances</strong>などのテーブルがまだない可能性があります。管理者に連絡し、テーブル作成（CREATE_ALL_TABLES.sql の実行）を依頼してください。</p>
           <p className="text-gray-700 font-medium mt-3">Q3. 入力・編集できる期限はいつまで？</p>
-          <p className="text-gray-700 text-sm"><strong>翌月10日</strong>までです。それを過ぎた月は編集・削除できません。画面上の「期限：翌月10日」を目安にしてください。</p>
+          <p className="text-gray-700 text-sm">日付による締め切りはありません。ただし、<strong>手当申請</strong>を送信した月は申請済みのため編集・削除できません。内容を直したい場合は管理者に連絡し、差し戻しの案内を受けてください。</p>
           <p className="text-gray-700 font-medium mt-3">Q4. 申請したあとで内容を直したい</p>
           <p className="text-gray-700 text-sm">申請後は本人では編集できません。<strong>管理者に連絡</strong>し、いったん差し戻し（または対応方法）の案内を受けてください。</p>
           <p className="text-gray-700 font-medium mt-3">Q5. 複数日まとめて入力で、一部の日だけ内容を変えたい</p>
