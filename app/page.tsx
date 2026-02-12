@@ -618,7 +618,9 @@ export default function Home() {
     
     // 休日判定: dayTypeに'休日'が含まれる場合は休日、それ以外は勤務日
     const isWorkDay = !dayType.includes('休日') && (dayType.includes('勤務日') || dayType.includes('授業'))
-    console.log('勤務日判定:', isWorkDay)
+    // 休日・勤務日の指定がない日（(仮)付きや未設定）は全手当項目を選択可能にする
+    const dayTypeUnspecified = dayType.includes('(仮)') || !dayType?.trim() || dayType === '---'
+    console.log('勤務日判定:', isWorkDay, '指定なし:', dayTypeUnspecified)
     
     if (!activityId) { 
       console.log('activityIdが未選択のため、0円')
@@ -626,7 +628,7 @@ export default function Home() {
       return 
     }
     
-    const validation = canSelectActivity(activityId, isWorkDay)
+    const validation = canSelectActivity(activityId, isWorkDay, dayTypeUnspecified)
     if (!validation.allowed) {
       console.warn('選択制限:', validation.message)
     }
@@ -1345,9 +1347,9 @@ export default function Home() {
                     value={activityId} 
                     onChange={(e) => {
                         const newActivityId = e.target.value
-                        // 休日判定: dayTypeに'休日'が含まれる場合は休日、それ以外は勤務日
                         const isWorkDay = !dayType.includes('休日') && (dayType.includes('勤務日') || dayType.includes('授業'))
-                        const validation = canSelectActivity(newActivityId, isWorkDay)
+                        const dayTypeUnspecified = dayType.includes('(仮)') || !dayType?.trim() || dayType === '---'
+                        const validation = canSelectActivity(newActivityId, isWorkDay, dayTypeUnspecified)
                         if (!validation.allowed) {
                             alert(validation.message)
                             return
@@ -1360,9 +1362,9 @@ export default function Home() {
                 >
                     <option value="">なし (部活なし)</option>
                     {ACTIVITY_TYPES.map(type => {
-                        // 休日判定: dayTypeに'休日'が含まれる場合は休日、それ以外は勤務日
                         const isWorkDay = !dayType.includes('休日') && (dayType.includes('勤務日') || dayType.includes('授業'))
-                        const validation = canSelectActivity(type.id, isWorkDay)
+                        const dayTypeUnspecified = dayType.includes('(仮)') || !dayType?.trim() || dayType === '---'
+                        const validation = canSelectActivity(type.id, isWorkDay, dayTypeUnspecified)
                         return (
                             <option 
                                 key={type.id} 
@@ -1375,9 +1377,9 @@ export default function Home() {
                     })}
                 </select>
                 {activityId && (() => {
-                    // 休日判定: dayTypeに'休日'が含まれる場合は休日、それ以外は勤務日
                     const isWorkDay = !dayType.includes('休日') && (dayType.includes('勤務日') || dayType.includes('授業'))
-                    const validation = canSelectActivity(activityId, isWorkDay)
+                    const dayTypeUnspecified = dayType.includes('(仮)') || !dayType?.trim() || dayType === '---'
+                    const validation = canSelectActivity(activityId, isWorkDay, dayTypeUnspecified)
                     if (!validation.allowed) {
                         return <div className="text-xs text-red-600 mt-1 font-bold">⚠️ {validation.message}</div>
                     }

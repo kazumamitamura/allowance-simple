@@ -293,28 +293,27 @@ export const calculateAmount = (
 
 /**
  * 勤務日判定用のヘルパー関数
+ * @param dayTypeUnspecified true のときは休日/勤務日の指定がないとみなし、全項目を選択可能にする
  */
 export const canSelectActivity = (
     activityId: string, 
-    isWorkDay: boolean
+    isWorkDay: boolean,
+    dayTypeUnspecified?: boolean
 ): { allowed: boolean, message?: string } => {
+    if (dayTypeUnspecified) return { allowed: true }
     const activity = ACTIVITY_TYPES.find(a => a.id === activityId)
     if (!activity) return { allowed: true }
     
     // A（休日部活1日）とB（休日部活半日）は休日のみ選択可能
-    // ただし、isWorkDayがfalse（休日）の場合は選択可能
     if (activity.requiresHoliday) {
         if (isWorkDay) {
             return { 
                 allowed: false, 
                 message: `${activity.label}は休日のみ選択可能です。勤務日には選択できません。` 
             }
-        } else {
-            // 休日の場合は選択可能
-            return { allowed: true }
         }
+        return { allowed: true }
     }
-    
     return { allowed: true }
 }
 
