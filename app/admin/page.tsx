@@ -17,6 +17,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<Record<string, number>>({})
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [clearingSchedules, setClearingSchedules] = useState(false)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -172,6 +173,30 @@ export default function AdminDashboard() {
       alert('CSVの読み込みに失敗しました: ' + (err instanceof Error ? err.message : String(err)))
     }
     setUploading(false)
+  }
+
+  const handleClearAnnualSchedules = async () => {
+    if (!confirm('年間勤務表の登録データをすべて取り消しますか？\n\nカレンダーへの反映が取り消され、データは復元できません。')) return
+    setClearingSchedules(true)
+    try {
+      const { data: existing } = await supabase.from('annual_schedules').select('id').limit(1)
+      if (!existing || existing.length === 0) {
+        alert('登録されているデータがありません。')
+        setClearingSchedules(false)
+        return
+      }
+      const { error } = await supabase.from('annual_schedules').delete().gte('id', 1)
+      if (error) {
+        console.error('年間勤務表取り消しエラー:', error)
+        alert('取り消しに失敗しました: ' + error.message)
+      } else {
+        alert('✅ 年間勤務表の登録データを取り消しました。\n\nカレンダーへの反映が解除されます。')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('取り消しの処理中にエラーが発生しました。')
+    }
+    setClearingSchedules(false)
   }
 
   if (!isAuthorized) return <div className="p-10 text-center">確認中...</div>
@@ -373,6 +398,17 @@ export default function AdminDashboard() {
               className="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition"
             >
               {uploading ? '処理中...' : 'アップロード'}
+            </button>
+          </div>
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <p className="text-sm text-gray-600 mb-2">登録済みの年間勤務表データを取り下げる場合</p>
+            <button
+              type="button"
+              onClick={handleClearAnnualSchedules}
+              disabled={clearingSchedules}
+              className="px-4 py-2 bg-red-100 text-red-700 font-bold rounded-lg hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed transition border border-red-200"
+            >
+              {clearingSchedules ? '取り消し中...' : '登録データを取り消す'}
             </button>
           </div>
         </div>

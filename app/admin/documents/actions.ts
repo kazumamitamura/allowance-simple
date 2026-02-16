@@ -80,7 +80,9 @@ export async function uploadDocument(data: {
       
       // バケットが存在しない場合の詳細なエラーメッセージ
       if (uploadError.message.includes('Bucket not found') || uploadError.message.includes('not found')) {
-        return { error: 'ファイルのアップロードに失敗しました: Bucket not found\n\nSupabase Dashboard で Storage バケット「documents」を作成してください。\n詳細は SETUP_INQUIRIES_AND_DOCUMENTS.md を参照してください。' }
+        return {
+          error: 'ファイルのアップロードに失敗しました: Bucket not found\n\n【対処方法】\n1. Supabase Dashboard にログイン\n2. 左メニュー「Storage」を開く\n3. 「New bucket」で名前を「documents」、Public はオフで作成\n4. 作成後、SETUP_INQUIRIES_AND_DOCUMENTS.md の「Storage ポリシーの設定」に従いポリシーを追加\n\n詳細は SETUP_INQUIRIES_AND_DOCUMENTS.md を参照してください。'
+        }
       }
       
       // Invalid key エラーの場合
