@@ -63,82 +63,102 @@ export default function ExportPage() {
     }
 
     setLoading(true)
-    const yearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
-    const lastDay = new Date(selectedYear, selectedMonth, 0).getDate()
-    const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`
-    
-    // データ取得
-    const { data: allowances } = await supabase
-      .from('allowances')
-      .select('*')
-      .eq('user_id', selectedUser)
-      .gte('date', `${yearMonth}-01`)
-      .lte('date', endDate)
-      .order('date', { ascending: true })
+    try {
+      console.log('Step 1: データ取得開始')
+      const yearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
+      const lastDay = new Date(selectedYear, selectedMonth, 0).getDate()
+      const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`
+      
+      // データ取得
+      const { data: allowances, error: fetchError } = await supabase
+        .from('allowances')
+        .select('*')
+        .eq('user_id', selectedUser)
+        .gte('date', `${yearMonth}-01`)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
 
-    const user = users.find(u => u.email === selectedUser)
-    const userName = user?.display_name || selectedUser
-    
-    // 合計計算
-    const total = allowances?.reduce((sum, item) => sum + item.amount, 0) || 0
-    const campCount = allowances?.filter(a => a.activity_type.includes('合宿')).length || 0
-    const expeditionCount = allowances?.filter(a => a.activity_type.includes('遠征')).length || 0
-    
-    // 曜日を取得するヘルパー関数
-    const getDayOfWeek = (dateStr: string) => {
-      const days = ['日', '月', '火', '水', '木', '金', '土']
-      const date = new Date(dateStr)
-      return days[date.getDay()]
+      if (fetchError) {
+        throw new Error(`データ取得エラー: ${fetchError.message}`)
+      }
+
+      console.log('Step 2: データ取得完了', { count: allowances?.length || 0 })
+
+      const user = users.find(u => u.email === selectedUser || u.user_id === selectedUser)
+      const userName = user?.display_name || selectedUser || 'unknown'
+      
+      console.log('Step 3: 合計計算開始')
+      // 合計計算
+      const total = (allowances || []).reduce((sum, item) => sum + (item.amount ?? 0), 0)
+      const campCount = (allowances || []).filter(a => a.activity_type?.includes('合宿')).length || 0
+      const expeditionCount = (allowances || []).filter(a => a.activity_type?.includes('遠征')).length || 0
+      
+      // 曜日を取得するヘルパー関数
+      const getDayOfWeek = (dateStr: string) => {
+        if (!dateStr) return ''
+        const days = ['日', '月', '火', '水', '木', '金', '土']
+        const date = new Date(dateStr)
+        if (isNaN(date.getTime())) return ''
+        return days[date.getDay()] || ''
+      }
+      
+      console.log('Step 4: Excelデータ変換開始')
+      // 【aoa_to_sheet を使用した帳票レイアウト】
+      
+      // 1行目: サマリー1（氏名と支給合計額）
+      const headerRows = [
+        ['氏名', `${userName} 様`, '支給合計額', total],  // B列に氏名、D列に金額（数値型）
+        ['対象月', `${selectedYear}年${selectedMonth}月`, '活動内訳', `合宿:${campCount}日 / 遠征:${expeditionCount}日`],  // 2行目
+        [],  // 3行目: 空行（見やすくするため）
+        ['日付', '曜日', '手当区分', '業務内容', '宿泊', '運転', '金額']  // 4行目: テーブルヘッダー
+      ]
+      
+      // 5行目以降: 明細データ（ボディ部分）
+      const bodyRows = (allowances || []).map(record => [
+        record.date || '',                        // A列: 日付
+        getDayOfWeek(record.date || ''),          // B列: 曜日
+        record.activity_type || '',               // C列: 手当区分
+        record.destination_detail || '-',         // D列: 業務内容
+        record.is_accommodation ? '○' : '',       // E列: 宿泊
+        record.is_driving ? '○' : '',             // F列: 運転
+        record.amount ?? 0                        // G列: 金額（数値型で出力）
+      ])
+      
+      // 合計行
+      const totalRow = ['合計', '', '', '', '', '', total]  // G列に合計金額
+      
+      console.log('Step 5: ExcelJSワークブック作成')
+      // 結合してシート化
+      const allRows = [...headerRows, ...bodyRows, totalRow]
+      const ws = XLSX.utils.aoa_to_sheet(allRows)
+      
+      // 列幅の調整（見切れ防止）
+      ws['!cols'] = [
+        { wch: 12 },  // A: 日付
+        { wch: 5 },   // B: 曜日
+        { wch: 25 },  // C: 手当区分
+        { wch: 30 },  // D: 業務内容
+        { wch: 5 },   // E: 宿泊
+        { wch: 5 },   // F: 運転
+        { wch: 10 }   // G: 金額
+      ]
+      
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '手当申請書')
+      
+      console.log('Step 6: ファイル書き出し開始')
+      // ファイル名: YYYY-MM_手当申請書_[氏名].xlsx
+      const fileName = `${yearMonth}_手当申請書_${userName}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      
+      console.log('Step 7: ファイル書き出し完了')
+      alert('✅ ダウンロードしました！\n\n帳票形式（氏名・サマリー付き）で出力されています。')
+    } catch (error) {
+      console.error('Excel生成エラー:', error)
+      alert('Excel出力に失敗しました。詳細はコンソールを確認してください。')
+    } finally {
+      setLoading(false)
     }
-    
-    // 【aoa_to_sheet を使用した帳票レイアウト】
-    
-    // 1行目: サマリー1（氏名と支給合計額）
-    const headerRows = [
-      ['氏名', `${userName} 様`, '支給合計額', total],  // B列に氏名、D列に金額（数値型）
-      ['対象月', `${selectedYear}年${selectedMonth}月`, '活動内訳', `合宿:${campCount}日 / 遠征:${expeditionCount}日`],  // 2行目
-      [],  // 3行目: 空行（見やすくするため）
-      ['日付', '曜日', '手当区分', '業務内容', '宿泊', '運転', '金額']  // 4行目: テーブルヘッダー
-    ]
-    
-    // 5行目以降: 明細データ（ボディ部分）
-    const bodyRows = allowances?.map(record => [
-      record.date,                        // A列: 日付
-      getDayOfWeek(record.date),          // B列: 曜日
-      record.activity_type,               // C列: 手当区分
-      record.destination_detail || '-',   // D列: 業務内容
-      record.is_accommodation ? '○' : '', // E列: 宿泊
-      record.is_driving ? '○' : '',       // F列: 運転
-      record.amount                       // G列: 金額（数値型で出力）
-    ]) || []
-    
-    // 合計行
-    const totalRow = ['合計', '', '', '', '', '', total]  // G列に合計金額
-    
-    // 結合してシート化
-    const allRows = [...headerRows, ...bodyRows, totalRow]
-    const ws = XLSX.utils.aoa_to_sheet(allRows)
-    
-    // 列幅の調整（見切れ防止）
-    ws['!cols'] = [
-      { wch: 12 },  // A: 日付
-      { wch: 5 },   // B: 曜日
-      { wch: 25 },  // C: 手当区分
-      { wch: 30 },  // D: 業務内容
-      { wch: 5 },   // E: 宿泊
-      { wch: 5 },   // F: 運転
-      { wch: 10 }   // G: 金額
-    ]
-    
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, '手当申請書')
-    
-    // ファイル名: YYYY-MM_手当申請書_[氏名].xlsx
-    const fileName = `${yearMonth}_手当申請書_${userName}.xlsx`
-    XLSX.writeFile(wb, fileName)
-    
-    setLoading(false)
-    alert('✅ ダウンロードしました！\n\n帳票形式（氏名・サマリー付き）で出力されています。')
   }
 
   // 個人年次レポート（帳票形式 - aoa_to_sheet使用）
@@ -149,242 +169,299 @@ export default function ExportPage() {
     }
 
     setLoading(true)
-    
-    // データ取得
-    const { data: allowances } = await supabase
-      .from('allowances')
-      .select('*')
-      .eq('user_id', selectedUser)
-      .gte('date', `${selectedYear}-01-01`)
-      .lte('date', `${selectedYear}-12-31`)
-      .order('date', { ascending: true })
+    try {
+      console.log('Step 1: データ取得開始')
+      // データ取得
+      const { data: allowances, error: fetchError } = await supabase
+        .from('allowances')
+        .select('*')
+        .eq('user_id', selectedUser)
+        .gte('date', `${selectedYear}-01-01`)
+        .lte('date', `${selectedYear}-12-31`)
+        .order('date', { ascending: true })
 
-    const user = users.find(u => u.email === selectedUser)
-    const userName = user?.display_name || selectedUser
-    
-    // 月別集計
-    const monthlyTotals: Record<number, number> = {}
-    allowances?.forEach(item => {
-      const month = parseInt(item.date.split('-')[1])
-      monthlyTotals[month] = (monthlyTotals[month] || 0) + item.amount
-    })
+      if (fetchError) {
+        throw new Error(`データ取得エラー: ${fetchError.message}`)
+      }
 
-    // 合計計算
-    const total = Object.values(monthlyTotals).reduce((sum, val) => sum + val, 0)
-    const campCount = allowances?.filter(a => a.activity_type.includes('合宿')).length || 0
-    const expeditionCount = allowances?.filter(a => a.activity_type.includes('遠征')).length || 0
+      console.log('Step 2: データ取得完了', { count: allowances?.length || 0 })
 
-    // 【aoa_to_sheet を使用した帳票レイアウト】
-    
-    // 1行目: サマリー1（氏名と支給合計額）
-    const headerRows = [
-      ['氏名', `${userName} 様`, '年間支給合計額', total],  // B列に氏名、D列に金額（数値型）
-      ['対象年', `${selectedYear}年`, '活動内訳', `合宿:${campCount}日 / 遠征:${expeditionCount}日`],  // 2行目
-      [],  // 3行目: 空行
-      ['月', '件数', '金額']  // 4行目: テーブルヘッダー
-    ]
-    
-    // 5行目以降: 月別データ
-    const bodyRows = Array.from({ length: 12 }, (_, i) => {
-      const month = i + 1
-      const count = allowances?.filter(a => parseInt(a.date.split('-')[1]) === month).length || 0
-      return [
-        `${month}月`,                // A列: 月
-        count,                       // B列: 件数（数値型）
-        monthlyTotals[month] || 0    // C列: 金額（数値型）
+      const user = users.find(u => u.email === selectedUser || u.user_id === selectedUser)
+      const userName = user?.display_name || selectedUser || 'unknown'
+      
+      console.log('Step 3: 月別集計計算開始')
+      // 月別集計
+      const monthlyTotals: Record<number, number> = {}
+      (allowances || []).forEach(item => {
+        if (!item.date) return
+        const month = parseInt(item.date.split('-')[1])
+        if (!isNaN(month) && month >= 1 && month <= 12) {
+          monthlyTotals[month] = (monthlyTotals[month] || 0) + (item.amount ?? 0)
+        }
+      })
+
+      // 合計計算
+      const total = Object.values(monthlyTotals).reduce((sum, val) => sum + val, 0)
+      const campCount = (allowances || []).filter(a => a.activity_type?.includes('合宿')).length || 0
+      const expeditionCount = (allowances || []).filter(a => a.activity_type?.includes('遠征')).length || 0
+
+      console.log('Step 4: Excelデータ変換開始')
+      // 【aoa_to_sheet を使用した帳票レイアウト】
+      
+      // 1行目: サマリー1（氏名と支給合計額）
+      const headerRows = [
+        ['氏名', `${userName} 様`, '年間支給合計額', total],  // B列に氏名、D列に金額（数値型）
+        ['対象年', `${selectedYear}年`, '活動内訳', `合宿:${campCount}日 / 遠征:${expeditionCount}日`],  // 2行目
+        [],  // 3行目: 空行
+        ['月', '件数', '金額']  // 4行目: テーブルヘッダー
       ]
-    })
-    
-    // 合計行
-    const totalRow = ['年間合計', allowances?.length || 0, total]  // 件数と金額は数値型
-    
-    // 結合してシート化
-    const allRows = [...headerRows, ...bodyRows, totalRow]
-    const ws = XLSX.utils.aoa_to_sheet(allRows)
-    
-    // 列幅設定
-    ws['!cols'] = [
-      { wch: 15 },  // A: 月
-      { wch: 12 },  // B: 件数
-      { wch: 15 }   // C: 金額
-    ]
-    
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, '年間集計')
-    
-    // ファイル名: YYYY_手当年間集計_[氏名].xlsx
-    const fileName = `${selectedYear}_手当年間集計_${userName}.xlsx`
-    XLSX.writeFile(wb, fileName)
-    
-    setLoading(false)
-    alert('✅ ダウンロードしました！\n\n帳票形式（氏名・サマリー付き）で出力されています。')
+      
+      // 5行目以降: 月別データ
+      const bodyRows = Array.from({ length: 12 }, (_, i) => {
+        const month = i + 1
+        const count = (allowances || []).filter(a => a.date && parseInt(a.date.split('-')[1]) === month).length || 0
+        return [
+          `${month}月`,                // A列: 月
+          count,                       // B列: 件数（数値型）
+          monthlyTotals[month] || 0    // C列: 金額（数値型）
+        ]
+      })
+      
+      // 合計行
+      const totalRow = ['年間合計', allowances?.length || 0, total]  // 件数と金額は数値型
+      
+      console.log('Step 5: ExcelJSワークブック作成')
+      // 結合してシート化
+      const allRows = [...headerRows, ...bodyRows, totalRow]
+      const ws = XLSX.utils.aoa_to_sheet(allRows)
+      
+      // 列幅設定
+      ws['!cols'] = [
+        { wch: 15 },  // A: 月
+        { wch: 12 },  // B: 件数
+        { wch: 15 }   // C: 金額
+      ]
+      
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '年間集計')
+      
+      console.log('Step 6: ファイル書き出し開始')
+      // ファイル名: YYYY_手当年間集計_[氏名].xlsx
+      const fileName = `${selectedYear}_手当年間集計_${userName}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      
+      console.log('Step 7: ファイル書き出し完了')
+      alert('✅ ダウンロードしました！\n\n帳票形式（氏名・サマリー付き）で出力されています。')
+    } catch (error) {
+      console.error('Excel生成エラー:', error)
+      alert('Excel出力に失敗しました。詳細はコンソールを確認してください。')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // 全体月次レポート（帳票形式 - aoa_to_sheet使用）
   const exportAllMonthly = async () => {
     setLoading(true)
-    const yearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
-    const lastDay = new Date(selectedYear, selectedMonth, 0).getDate()
-    const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`
-    
-    // データ取得
-    const { data: allowances } = await supabase
-      .from('allowances')
-      .select('*')
-      .gte('date', `${yearMonth}-01`)
-      .lte('date', endDate)
-      .order('user_email')
+    try {
+      console.log('Step 1: データ取得開始')
+      const yearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
+      const lastDay = new Date(selectedYear, selectedMonth, 0).getDate()
+      const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`
+      
+      // データ取得
+      const { data: allowances, error: fetchError } = await supabase
+        .from('allowances')
+        .select('*')
+        .gte('date', `${yearMonth}-01`)
+        .lte('date', endDate)
+        .order('user_email')
 
-    // ユーザー別集計
-    const userTotals: Record<string, { name: string, count: number, amount: number, camp: number, expedition: number }> = {}
-    allowances?.forEach(item => {
-      if (!userTotals[item.user_email]) {
-        const user = users.find(u => u.email === item.user_email)
-        userTotals[item.user_email] = {
-          name: user?.display_name || item.user_email,
-          count: 0,
-          amount: 0,
-          camp: 0,
-          expedition: 0
-        }
+      if (fetchError) {
+        throw new Error(`データ取得エラー: ${fetchError.message}`)
       }
-      userTotals[item.user_email].count++
-      userTotals[item.user_email].amount += item.amount
-      if (item.activity_type.includes('合宿')) userTotals[item.user_email].camp++
-      if (item.activity_type.includes('遠征')) userTotals[item.user_email].expedition++
-    })
 
-    // 合計計算
-    const totalCount = Object.values(userTotals).reduce((sum, data) => sum + data.count, 0)
-    const totalAmount = Object.values(userTotals).reduce((sum, data) => sum + data.amount, 0)
-    const totalCamp = Object.values(userTotals).reduce((sum, data) => sum + data.camp, 0)
-    const totalExpedition = Object.values(userTotals).reduce((sum, data) => sum + data.expedition, 0)
+      console.log('Step 2: データ取得完了', { count: allowances?.length || 0 })
 
-    // 【aoa_to_sheet を使用した帳票レイアウト】
-    
-    // 1行目: サマリー1（タイトルと支給合計額）
-    const headerRows = [
-      ['手当全体集計（月次）', '', '支給合計額', totalAmount],  // D列に金額（数値型）
-      ['対象月', `${selectedYear}年${selectedMonth}月`, '活動内訳', `合宿:${totalCamp}日 / 遠征:${totalExpedition}日`],  // 2行目
-      [],  // 3行目: 空行
-      ['職員名', '件数', '金額', '合宿日数', '遠征日数']  // 4行目: テーブルヘッダー
-    ]
-    
-    // 5行目以降: 職員別データ
-    const bodyRows = Object.entries(userTotals).map(([email, data]) => [
-      data.name,       // A列: 職員名
-      data.count,      // B列: 件数（数値型）
-      data.amount,     // C列: 金額（数値型）
-      data.camp,       // D列: 合宿日数（数値型）
-      data.expedition  // E列: 遠征日数（数値型）
-    ])
-    
-    // 合計行
-    const totalRow = ['合計', totalCount, totalAmount, totalCamp, totalExpedition]  // すべて数値型
-    
-    // 結合してシート化
-    const allRows = [...headerRows, ...bodyRows, totalRow]
-    const ws = XLSX.utils.aoa_to_sheet(allRows)
-    
-    // 列幅設定
-    ws['!cols'] = [
-      { wch: 20 },  // A: 職員名
-      { wch: 10 },  // B: 件数
-      { wch: 15 },  // C: 金額
-      { wch: 12 },  // D: 合宿日数
-      { wch: 12 }   // E: 遠征日数
-    ]
-    
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, '全体集計')
-    
-    // ファイル名: YYYY-MM_全体集計.xlsx
-    XLSX.writeFile(wb, `${yearMonth}_全体集計.xlsx`)
-    
-    setLoading(false)
-    alert('✅ ダウンロードしました！\n\n帳票形式（サマリー付き）で出力されています。')
+      console.log('Step 3: ユーザー別集計計算開始')
+      // ユーザー別集計
+      const userTotals: Record<string, { name: string, count: number, amount: number, camp: number, expedition: number }> = {}
+      (allowances || []).forEach(item => {
+        if (!item.user_email) return
+        if (!userTotals[item.user_email]) {
+          const user = users.find(u => u.email === item.user_email)
+          userTotals[item.user_email] = {
+            name: user?.display_name || item.user_email || '',
+            count: 0,
+            amount: 0,
+            camp: 0,
+            expedition: 0
+          }
+        }
+        userTotals[item.user_email].count++
+        userTotals[item.user_email].amount += (item.amount ?? 0)
+        if (item.activity_type?.includes('合宿')) userTotals[item.user_email].camp++
+        if (item.activity_type?.includes('遠征')) userTotals[item.user_email].expedition++
+      })
+
+      // 合計計算
+      const totalCount = Object.values(userTotals).reduce((sum, data) => sum + (data.count || 0), 0)
+      const totalAmount = Object.values(userTotals).reduce((sum, data) => sum + (data.amount || 0), 0)
+      const totalCamp = Object.values(userTotals).reduce((sum, data) => sum + (data.camp || 0), 0)
+      const totalExpedition = Object.values(userTotals).reduce((sum, data) => sum + (data.expedition || 0), 0)
+
+      console.log('Step 4: Excelデータ変換開始')
+      // 【aoa_to_sheet を使用した帳票レイアウト】
+      
+      // 1行目: サマリー1（タイトルと支給合計額）
+      const headerRows = [
+        ['手当全体集計（月次）', '', '支給合計額', totalAmount],  // D列に金額（数値型）
+        ['対象月', `${selectedYear}年${selectedMonth}月`, '活動内訳', `合宿:${totalCamp}日 / 遠征:${totalExpedition}日`],  // 2行目
+        [],  // 3行目: 空行
+        ['職員名', '件数', '金額', '合宿日数', '遠征日数']  // 4行目: テーブルヘッダー
+      ]
+      
+      // 5行目以降: 職員別データ
+      const bodyRows = Object.entries(userTotals).map(([email, data]) => [
+        data.name || '',       // A列: 職員名
+        data.count || 0,       // B列: 件数（数値型）
+        data.amount || 0,       // C列: 金額（数値型）
+        data.camp || 0,         // D列: 合宿日数（数値型）
+        data.expedition || 0    // E列: 遠征日数（数値型）
+      ])
+      
+      // 合計行
+      const totalRow = ['合計', totalCount, totalAmount, totalCamp, totalExpedition]  // すべて数値型
+      
+      console.log('Step 5: ExcelJSワークブック作成')
+      // 結合してシート化
+      const allRows = [...headerRows, ...bodyRows, totalRow]
+      const ws = XLSX.utils.aoa_to_sheet(allRows)
+      
+      // 列幅設定
+      ws['!cols'] = [
+        { wch: 20 },  // A: 職員名
+        { wch: 10 },  // B: 件数
+        { wch: 15 },  // C: 金額
+        { wch: 12 },  // D: 合宿日数
+        { wch: 12 }   // E: 遠征日数
+      ]
+      
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '全体集計')
+      
+      console.log('Step 6: ファイル書き出し開始')
+      // ファイル名: YYYY-MM_全体集計.xlsx
+      XLSX.writeFile(wb, `${yearMonth}_全体集計.xlsx`)
+      
+      console.log('Step 7: ファイル書き出し完了')
+      alert('✅ ダウンロードしました！\n\n帳票形式（サマリー付き）で出力されています。')
+    } catch (error) {
+      console.error('Excel生成エラー:', error)
+      alert('Excel出力に失敗しました。詳細はコンソールを確認してください。')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // 全体年次レポート（帳票形式 - aoa_to_sheet使用）
   const exportAllYearly = async () => {
     setLoading(true)
-    
-    // データ取得
-    const { data: allowances } = await supabase
-      .from('allowances')
-      .select('*')
-      .gte('date', `${selectedYear}-01-01`)
-      .lte('date', `${selectedYear}-12-31`)
-      .order('user_email')
+    try {
+      console.log('Step 1: データ取得開始')
+      // データ取得
+      const { data: allowances, error: fetchError } = await supabase
+        .from('allowances')
+        .select('*')
+        .gte('date', `${selectedYear}-01-01`)
+        .lte('date', `${selectedYear}-12-31`)
+        .order('user_email')
 
-    // ユーザー別集計
-    const userTotals: Record<string, { name: string, count: number, amount: number, camp: number, expedition: number }> = {}
-    allowances?.forEach(item => {
-      if (!userTotals[item.user_email]) {
-        const user = users.find(u => u.email === item.user_email)
-        userTotals[item.user_email] = {
-          name: user?.display_name || item.user_email,
-          count: 0,
-          amount: 0,
-          camp: 0,
-          expedition: 0
-        }
+      if (fetchError) {
+        throw new Error(`データ取得エラー: ${fetchError.message}`)
       }
-      userTotals[item.user_email].count++
-      userTotals[item.user_email].amount += item.amount
-      if (item.activity_type.includes('合宿')) userTotals[item.user_email].camp++
-      if (item.activity_type.includes('遠征')) userTotals[item.user_email].expedition++
-    })
 
-    // 合計計算
-    const totalCount = Object.values(userTotals).reduce((sum, data) => sum + data.count, 0)
-    const totalAmount = Object.values(userTotals).reduce((sum, data) => sum + data.amount, 0)
-    const totalCamp = Object.values(userTotals).reduce((sum, data) => sum + data.camp, 0)
-    const totalExpedition = Object.values(userTotals).reduce((sum, data) => sum + data.expedition, 0)
+      console.log('Step 2: データ取得完了', { count: allowances?.length || 0 })
 
-    // 【aoa_to_sheet を使用した帳票レイアウト】
-    
-    // 1行目: サマリー1（タイトルと支給合計額）
-    const headerRows = [
-      ['手当年間全体集計', '', '年間支給合計額', totalAmount],  // D列に金額（数値型）
-      ['対象年', `${selectedYear}年`, '活動内訳', `合宿:${totalCamp}日 / 遠征:${totalExpedition}日`],  // 2行目
-      [],  // 3行目: 空行
-      ['職員名', '件数', '金額', '合宿日数', '遠征日数']  // 4行目: テーブルヘッダー
-    ]
-    
-    // 5行目以降: 職員別データ
-    const bodyRows = Object.entries(userTotals).map(([email, data]) => [
-      data.name,       // A列: 職員名
-      data.count,      // B列: 件数（数値型）
-      data.amount,     // C列: 金額（数値型）
-      data.camp,       // D列: 合宿日数（数値型）
-      data.expedition  // E列: 遠征日数（数値型）
-    ])
-    
-    // 合計行
-    const totalRow = ['合計', totalCount, totalAmount, totalCamp, totalExpedition]  // すべて数値型
-    
-    // 結合してシート化
-    const allRows = [...headerRows, ...bodyRows, totalRow]
-    const ws = XLSX.utils.aoa_to_sheet(allRows)
-    
-    // 列幅設定
-    ws['!cols'] = [
-      { wch: 20 },  // A: 職員名
-      { wch: 10 },  // B: 件数
-      { wch: 15 },  // C: 金額
-      { wch: 12 },  // D: 合宿日数
-      { wch: 12 }   // E: 遠征日数
-    ]
-    
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, '年間全体集計')
-    
-    // ファイル名: YYYY_年間全体集計.xlsx
-    XLSX.writeFile(wb, `${selectedYear}_年間全体集計.xlsx`)
-    
-    setLoading(false)
-    alert('✅ ダウンロードしました！\n\n帳票形式（サマリー付き）で出力されています。')
+      console.log('Step 3: ユーザー別集計計算開始')
+      // ユーザー別集計
+      const userTotals: Record<string, { name: string, count: number, amount: number, camp: number, expedition: number }> = {}
+      (allowances || []).forEach(item => {
+        if (!item.user_email) return
+        if (!userTotals[item.user_email]) {
+          const user = users.find(u => u.email === item.user_email)
+          userTotals[item.user_email] = {
+            name: user?.display_name || item.user_email || '',
+            count: 0,
+            amount: 0,
+            camp: 0,
+            expedition: 0
+          }
+        }
+        userTotals[item.user_email].count++
+        userTotals[item.user_email].amount += (item.amount ?? 0)
+        if (item.activity_type?.includes('合宿')) userTotals[item.user_email].camp++
+        if (item.activity_type?.includes('遠征')) userTotals[item.user_email].expedition++
+      })
+
+      // 合計計算
+      const totalCount = Object.values(userTotals).reduce((sum, data) => sum + (data.count || 0), 0)
+      const totalAmount = Object.values(userTotals).reduce((sum, data) => sum + (data.amount || 0), 0)
+      const totalCamp = Object.values(userTotals).reduce((sum, data) => sum + (data.camp || 0), 0)
+      const totalExpedition = Object.values(userTotals).reduce((sum, data) => sum + (data.expedition || 0), 0)
+
+      console.log('Step 4: Excelデータ変換開始')
+      // 【aoa_to_sheet を使用した帳票レイアウト】
+      
+      // 1行目: サマリー1（タイトルと支給合計額）
+      const headerRows = [
+        ['手当年間全体集計', '', '年間支給合計額', totalAmount],  // D列に金額（数値型）
+        ['対象年', `${selectedYear}年`, '活動内訳', `合宿:${totalCamp}日 / 遠征:${totalExpedition}日`],  // 2行目
+        [],  // 3行目: 空行
+        ['職員名', '件数', '金額', '合宿日数', '遠征日数']  // 4行目: テーブルヘッダー
+      ]
+      
+      // 5行目以降: 職員別データ
+      const bodyRows = Object.entries(userTotals).map(([email, data]) => [
+        data.name || '',       // A列: 職員名
+        data.count || 0,       // B列: 件数（数値型）
+        data.amount || 0,       // C列: 金額（数値型）
+        data.camp || 0,         // D列: 合宿日数（数値型）
+        data.expedition || 0    // E列: 遠征日数（数値型）
+      ])
+      
+      // 合計行
+      const totalRow = ['合計', totalCount, totalAmount, totalCamp, totalExpedition]  // すべて数値型
+      
+      console.log('Step 5: ExcelJSワークブック作成')
+      // 結合してシート化
+      const allRows = [...headerRows, ...bodyRows, totalRow]
+      const ws = XLSX.utils.aoa_to_sheet(allRows)
+      
+      // 列幅設定
+      ws['!cols'] = [
+        { wch: 20 },  // A: 職員名
+        { wch: 10 },  // B: 件数
+        { wch: 15 },  // C: 金額
+        { wch: 12 },  // D: 合宿日数
+        { wch: 12 }   // E: 遠征日数
+      ]
+      
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '年間全体集計')
+      
+      console.log('Step 6: ファイル書き出し開始')
+      // ファイル名: YYYY_年間全体集計.xlsx
+      XLSX.writeFile(wb, `${selectedYear}_年間全体集計.xlsx`)
+      
+      console.log('Step 7: ファイル書き出し完了')
+      alert('✅ ダウンロードしました！\n\n帳票形式（サマリー付き）で出力されています。')
+    } catch (error) {
+      console.error('Excel生成エラー:', error)
+      alert('Excel出力に失敗しました。詳細はコンソールを確認してください。')
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (!isAdmin) return <div className="p-10 text-center">確認中...</div>
