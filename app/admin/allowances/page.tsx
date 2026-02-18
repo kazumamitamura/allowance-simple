@@ -38,33 +38,47 @@ export default function AllowanceManagementPage() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        alert('ログインが必要です')
-        router.push('/login')
-        return
-      }
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          alert('ログインが必要です')
+          router.push('/login')
+          setLoading(false)
+          return
+        }
 
-      const hasAccess = checkAccess(user.email || '', canManageAllowances)
-      if (!hasAccess) {
-        alert('手当管理の権限がありません')
-        router.push('/admin')
-        return
-      }
+        const hasAccess = checkAccess(user.email || '', canManageAllowances)
+        if (!hasAccess) {
+          alert('手当管理の権限がありません')
+          router.push('/admin')
+          setLoading(false)
+          return
+        }
 
-      setUserEmail(user.email || '')
-      setIsAuthorized(true)
-      fetchUsers()
+        setUserEmail(user.email || '')
+        setIsAuthorized(true)
+        await fetchUsers()
+      } catch (error) {
+        console.error('認証チェックエラー:', error)
+        alert('認証チェックに失敗しました')
+      } finally {
+        setLoading(false)
+      }
     }
     checkAuth()
   }, [])
 
   const fetchUsers = async () => {
-    const { data, error } = await supabase.from('user_profiles').select('*').order('display_name')
-    if (error) {
-      logSupabaseError('ユーザー一覧取得', error)
+    try {
+      const { data, error } = await supabase.from('user_profiles').select('*').order('display_name')
+      if (error) {
+        logSupabaseError('ユーザー一覧取得', error)
+      }
+      setUsers(data || [])
+    } catch (error) {
+      console.error('ユーザー取得エラー:', error)
+      setUsers([])
     }
-    setUsers(data || [])
   }
 
   // Excel出力機能
@@ -128,12 +142,16 @@ export default function AllowanceManagementPage() {
       const fileName = `手当明細_${user?.display_name || selectedUser || 'unknown'}_${yearMonth}.xlsx`
       XLSX.writeFile(wb, fileName)
       
+      // ファイル書き出しは同期的だが、ブラウザの処理を待つため少し待機
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
       console.log('Step 6: ファイル書き出し完了')
       alert('ダウンロードしました！')
     } catch (error) {
       console.error('Excel生成エラー:', error)
-      alert('Excel出力に失敗しました。詳細はコンソールを確認してください。')
+      alert('Excel出力に失敗しました。詳細はコンソールを確認してください。\n\nエラー: ' + (error instanceof Error ? error.message : String(error)))
     } finally {
+      console.log('Step 7: 処理完了、ローディング解除')
       setExporting(false)
     }
   }
@@ -196,12 +214,16 @@ export default function AllowanceManagementPage() {
       const fileName = `手当年間集計_${user?.display_name || selectedUser || 'unknown'}_${selectedYear}.xlsx`
       XLSX.writeFile(wb, fileName)
       
+      // ファイル書き出しは同期的だが、ブラウザの処理を待つため少し待機
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
       console.log('Step 7: ファイル書き出し完了')
       alert('ダウンロードしました！')
     } catch (error) {
       console.error('Excel生成エラー:', error)
-      alert('Excel出力に失敗しました。詳細はコンソールを確認してください。')
+      alert('Excel出力に失敗しました。詳細はコンソールを確認してください。\n\nエラー: ' + (error instanceof Error ? error.message : String(error)))
     } finally {
+      console.log('Step 8: 処理完了、ローディング解除')
       setExporting(false)
     }
   }
@@ -266,20 +288,28 @@ export default function AllowanceManagementPage() {
       XLSX.utils.book_append_sheet(wb, ws, '全体集計')
       
       console.log('Step 6: ファイル書き出し開始')
-      XLSX.writeFile(wb, `手当全体集計_${yearMonth}.xlsx`)
+      const fileName = `手当全体集計_${yearMonth}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      
+      // ファイル書き出しは同期的だが、ブラウザの処理を待つため少し待機
+      await new Promise(resolve => setTimeout(resolve, 100))
       
       console.log('Step 7: ファイル書き出し完了')
       alert('ダウンロードしました！')
     } catch (error) {
       console.error('Excel生成エラー:', error)
-      alert('Excel出力に失敗しました。詳細はコンソールを確認してください。')
+      alert('Excel出力に失敗しました。詳細はコンソールを確認してください。\n\nエラー: ' + (error instanceof Error ? error.message : String(error)))
     } finally {
+      console.log('Step 8: 処理完了、ローディング解除')
       setExporting(false)
     }
   }
 
   const exportAllYearly = async () => {
+    console.log('=== exportAllYearly 関数が呼び出されました ===')
+    console.log('現在の状態:', { exporting, loading, selectedYear })
     setExporting(true)
+    console.log('setExporting(true) 実行完了')
     try {
       console.log('Step 1: データ取得開始')
       const { data: allowances, error: fetchError } = await supabase
@@ -334,14 +364,19 @@ export default function AllowanceManagementPage() {
       XLSX.utils.book_append_sheet(wb, ws, '年間全体集計')
       
       console.log('Step 6: ファイル書き出し開始')
-      XLSX.writeFile(wb, `手当年間全体集計_${selectedYear}.xlsx`)
+      const fileName = `手当年間全体集計_${selectedYear}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      
+      // ファイル書き出しは同期的だが、ブラウザの処理を待つため少し待機
+      await new Promise(resolve => setTimeout(resolve, 100))
       
       console.log('Step 7: ファイル書き出し完了')
       alert('ダウンロードしました！')
     } catch (error) {
       console.error('Excel生成エラー:', error)
-      alert('Excel出力に失敗しました。詳細はコンソールを確認してください。')
+      alert('Excel出力に失敗しました。詳細はコンソールを確認してください。\n\nエラー: ' + (error instanceof Error ? error.message : String(error)))
     } finally {
+      console.log('Step 8: 処理完了、ローディング解除')
       setExporting(false)
     }
   }
@@ -484,7 +519,15 @@ export default function AllowanceManagementPage() {
               </button>
 
               <button 
-                onClick={exportAllYearly}
+                onClick={(e) => {
+                  console.log('全体年次レポートボタンがクリックされました', e)
+                  e.preventDefault()
+                  exportAllYearly().catch(err => {
+                    console.error('exportAllYearly 実行エラー:', err)
+                    setExporting(false)
+                    alert('エラーが発生しました: ' + (err instanceof Error ? err.message : String(err)))
+                  })
+                }}
                 disabled={exporting}
                 className="bg-gradient-to-br from-blue-500 to-blue-600 p-8 rounded-2xl shadow-md hover:shadow-xl transition-all text-left group"
               >
@@ -535,6 +578,22 @@ export default function AllowanceManagementPage() {
             <div className="bg-white p-8 rounded-2xl shadow-xl text-center">
               <div className="text-4xl mb-4">⏳</div>
               <div className="text-lg font-bold text-slate-800">処理中...</div>
+              <div className="text-xs text-slate-500 mt-2">
+                {loading ? '初期化中...' : 'Excel生成中...'}
+              </div>
+              {/* デバッグ用: 強制解除ボタン（開発時のみ） */}
+              {(loading || exporting) && (
+                <button
+                  onClick={() => {
+                    console.warn('⚠️ ローディングを強制解除しました')
+                    setLoading(false)
+                    setExporting(false)
+                  }}
+                  className="mt-4 px-4 py-2 bg-red-500 text-white rounded text-xs"
+                >
+                  強制解除（デバッグ用）
+                </button>
+              )}
             </div>
           </div>
         )}
