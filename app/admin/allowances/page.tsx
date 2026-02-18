@@ -183,25 +183,34 @@ export default function AllowanceManagementPage() {
       
       console.log('Step 3: 月次集計計算開始')
       const monthlyTotals: Record<number, number> = {}
-      (allowances || []).forEach(item => {
-        if (!item.date) return
-        const month = parseInt(item.date.split('-')[1])
-        if (!isNaN(month) && month >= 1 && month <= 12) {
-          monthlyTotals[month] = (monthlyTotals[month] || 0) + (item.amount ?? 0)
-        }
-      })
+      const monthlyCounts: Record<number, number> = {}
+      for (const item of allowances || []) {
+        const dateStr = item?.date
+        if (!dateStr || typeof dateStr !== 'string') continue
+        const parts = dateStr.split('-')
+        const month = parseInt(parts[1] || '', 10)
+        if (Number.isNaN(month) || month < 1 || month > 12) continue
+        monthlyTotals[month] = (monthlyTotals[month] || 0) + (item.amount ?? 0)
+        monthlyCounts[month] = (monthlyCounts[month] || 0) + 1
+      }
 
       console.log('Step 4: Excelデータ変換開始')
-      const excelData = Array.from({ length: 12 }, (_, i) => ({
-        '月': `${i + 1}月`,
-        '件数': (allowances || []).filter(a => a.date && parseInt(a.date.split('-')[1]) === i + 1).length,
-        '金額': monthlyTotals[i + 1] || 0
-      }))
+      const excelData: Array<{ '月': string; '件数': number; '金額': number }> = []
+      let total = 0
+      for (let month = 1; month <= 12; month++) {
+        const amount = monthlyTotals[month] || 0
+        const count = monthlyCounts[month] || 0
+        total += amount
+        excelData.push({
+          '月': `${month}月`,
+          '件数': count,
+          '金額': amount
+        })
+      }
 
-      const total = Object.values(monthlyTotals).reduce((sum, val) => sum + val, 0)
       excelData.push({
         '月': '年間合計',
-        '件数': allowances?.length || 0,
+        '件数': (allowances || []).length,
         '金額': total
       })
 
@@ -251,30 +260,39 @@ export default function AllowanceManagementPage() {
 
       console.log('Step 3: ユーザー別集計計算開始')
       const userTotals: Record<string, { name: string, count: number, amount: number }> = {}
-      (allowances || []).forEach(item => {
-        if (!item.user_email) return
-        if (!userTotals[item.user_email]) {
-          const user = users.find(u => u.email === item.user_email)
-          userTotals[item.user_email] = {
-            name: user?.display_name || item.user_email || '',
+      for (const item of allowances || []) {
+        const email = item?.user_email
+        if (!email || typeof email !== 'string') continue
+        if (!userTotals[email]) {
+          const user = users.find(u => u.email === email)
+          userTotals[email] = {
+            name: user?.display_name || email || '',
             count: 0,
             amount: 0
           }
         }
-        userTotals[item.user_email].count++
-        userTotals[item.user_email].amount += (item.amount ?? 0)
-      })
+        userTotals[email].count++
+        userTotals[email].amount += (item.amount ?? 0)
+      }
 
       console.log('Step 4: Excelデータ変換開始')
-      const excelData = Object.entries(userTotals).map(([email, data]) => ({
-        '職員名': data.name || '',
-        'メールアドレス': email || '',
-        '件数': data.count || 0,
-        '金額': data.amount || 0
-      }))
+      const excelData: Array<{ '職員名': string; 'メールアドレス': string; '件数': number; '金額': number }> = []
+      let totalCount = 0
+      let totalAmount = 0
+      for (const email in userTotals) {
+        const data = userTotals[email]
+        const count = data?.count || 0
+        const amount = data?.amount || 0
+        totalCount += count
+        totalAmount += amount
+        excelData.push({
+          '職員名': data?.name || '',
+          'メールアドレス': email,
+          '件数': count,
+          '金額': amount
+        })
+      }
 
-      const totalCount = excelData.reduce((sum, row) => sum + (row['件数'] || 0), 0)
-      const totalAmount = excelData.reduce((sum, row) => sum + (row['金額'] || 0), 0)
       excelData.push({
         '職員名': '合計',
         'メールアドレス': '',
