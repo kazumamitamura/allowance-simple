@@ -75,49 +75,67 @@ export default function AllowanceManagementPage() {
     }
 
     setExporting(true)
-    const yearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
-    const lastDay = new Date(selectedYear, selectedMonth, 0).getDate()
-    const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`
-    
-    const { data: allowances } = await supabase
-      .from('allowances')
-      .select('*')
-      .eq('user_email', selectedUser)
-      .gte('date', `${yearMonth}-01`)
-      .lte('date', endDate)
-      .order('date')
+    try {
+      console.log('Step 1: データ取得開始')
+      const yearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
+      const lastDay = new Date(selectedYear, selectedMonth, 0).getDate()
+      const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`
+      
+      const { data: allowances, error: fetchError } = await supabase
+        .from('allowances')
+        .select('*')
+        .eq('user_email', selectedUser)
+        .gte('date', `${yearMonth}-01`)
+        .lte('date', endDate)
+        .order('date')
 
-    const user = users.find(u => u.email === selectedUser)
-    
-    const excelData = allowances?.map(item => ({
-      '日付': item.date,
-      '業務内容': item.activity_type,
-      '区分': item.destination_type,
-      '詳細': item.destination_detail || '',
-      '運転': item.is_driving ? '○' : '',
-      '宿泊': item.is_accommodation ? '○' : '',
-      '金額': item.amount
-    })) || []
+      if (fetchError) {
+        throw new Error(`データ取得エラー: ${fetchError.message}`)
+      }
 
-    const total = allowances?.reduce((sum, item) => sum + item.amount, 0) || 0
-    excelData.push({
-      '日付': '合計',
-      '業務内容': '',
-      '区分': '',
-      '詳細': '',
-      '運転': '',
-      '宿泊': '',
-      '金額': total
-    })
+      console.log('Step 2: データ取得完了', { count: allowances?.length || 0 })
 
-    const ws = XLSX.utils.json_to_sheet(excelData)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, '手当明細')
-    
-    XLSX.writeFile(wb, `手当明細_${user?.display_name || selectedUser}_${yearMonth}.xlsx`)
-    
-    setExporting(false)
-    alert('ダウンロードしました！')
+      const user = users.find(u => u.email === selectedUser)
+      
+      console.log('Step 3: Excelデータ変換開始')
+      const excelData = (allowances || []).map(item => ({
+        '日付': item.date || '',
+        '業務内容': item.activity_type || '',
+        '区分': item.destination_type || '',
+        '詳細': item.destination_detail || '',
+        '運転': item.is_driving ? '○' : '',
+        '宿泊': item.is_accommodation ? '○' : '',
+        '金額': item.amount ?? 0
+      }))
+
+      const total = (allowances || []).reduce((sum, item) => sum + (item.amount ?? 0), 0)
+      excelData.push({
+        '日付': '合計',
+        '業務内容': '',
+        '区分': '',
+        '詳細': '',
+        '運転': '',
+        '宿泊': '',
+        '金額': total
+      })
+
+      console.log('Step 4: ExcelJSワークブック作成')
+      const ws = XLSX.utils.json_to_sheet(excelData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '手当明細')
+      
+      console.log('Step 5: ファイル書き出し開始')
+      const fileName = `手当明細_${user?.display_name || selectedUser || 'unknown'}_${yearMonth}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      
+      console.log('Step 6: ファイル書き出し完了')
+      alert('ダウンロードしました！')
+    } catch (error) {
+      console.error('Excel生成エラー:', error)
+      alert('Excel出力に失敗しました。詳細はコンソールを確認してください。')
+    } finally {
+      setExporting(false)
+    }
   }
 
   const exportIndividualYearly = async () => {
@@ -127,147 +145,205 @@ export default function AllowanceManagementPage() {
     }
 
     setExporting(true)
-    
-    const { data: allowances } = await supabase
-      .from('allowances')
-      .select('*')
-      .eq('user_email', selectedUser)
-      .gte('date', `${selectedYear}-01-01`)
-      .lte('date', `${selectedYear}-12-31`)
-      .order('date')
+    try {
+      console.log('Step 1: データ取得開始')
+      const { data: allowances, error: fetchError } = await supabase
+        .from('allowances')
+        .select('*')
+        .eq('user_email', selectedUser)
+        .gte('date', `${selectedYear}-01-01`)
+        .lte('date', `${selectedYear}-12-31`)
+        .order('date')
 
-    const user = users.find(u => u.email === selectedUser)
-    
-    const monthlyTotals: Record<number, number> = {}
-    allowances?.forEach(item => {
-      const month = parseInt(item.date.split('-')[1])
-      monthlyTotals[month] = (monthlyTotals[month] || 0) + item.amount
-    })
+      if (fetchError) {
+        throw new Error(`データ取得エラー: ${fetchError.message}`)
+      }
 
-    const excelData = Array.from({ length: 12 }, (_, i) => ({
-      '月': `${i + 1}月`,
-      '件数': allowances?.filter(a => parseInt(a.date.split('-')[1]) === i + 1).length || 0,
-      '金額': monthlyTotals[i + 1] || 0
-    }))
+      console.log('Step 2: データ取得完了', { count: allowances?.length || 0 })
 
-    const total = Object.values(monthlyTotals).reduce((sum, val) => sum + val, 0)
-    excelData.push({
-      '月': '年間合計',
-      '件数': allowances?.length || 0,
-      '金額': total
-    })
+      const user = users.find(u => u.email === selectedUser)
+      
+      console.log('Step 3: 月次集計計算開始')
+      const monthlyTotals: Record<number, number> = {}
+      (allowances || []).forEach(item => {
+        if (!item.date) return
+        const month = parseInt(item.date.split('-')[1])
+        if (!isNaN(month) && month >= 1 && month <= 12) {
+          monthlyTotals[month] = (monthlyTotals[month] || 0) + (item.amount ?? 0)
+        }
+      })
 
-    const ws = XLSX.utils.json_to_sheet(excelData)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, '年間集計')
-    
-    XLSX.writeFile(wb, `手当年間集計_${user?.display_name || selectedUser}_${selectedYear}.xlsx`)
-    
-    setExporting(false)
-    alert('ダウンロードしました！')
+      console.log('Step 4: Excelデータ変換開始')
+      const excelData = Array.from({ length: 12 }, (_, i) => ({
+        '月': `${i + 1}月`,
+        '件数': (allowances || []).filter(a => a.date && parseInt(a.date.split('-')[1]) === i + 1).length,
+        '金額': monthlyTotals[i + 1] || 0
+      }))
+
+      const total = Object.values(monthlyTotals).reduce((sum, val) => sum + val, 0)
+      excelData.push({
+        '月': '年間合計',
+        '件数': allowances?.length || 0,
+        '金額': total
+      })
+
+      console.log('Step 5: ExcelJSワークブック作成')
+      const ws = XLSX.utils.json_to_sheet(excelData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '年間集計')
+      
+      console.log('Step 6: ファイル書き出し開始')
+      const fileName = `手当年間集計_${user?.display_name || selectedUser || 'unknown'}_${selectedYear}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      
+      console.log('Step 7: ファイル書き出し完了')
+      alert('ダウンロードしました！')
+    } catch (error) {
+      console.error('Excel生成エラー:', error)
+      alert('Excel出力に失敗しました。詳細はコンソールを確認してください。')
+    } finally {
+      setExporting(false)
+    }
   }
 
   const exportAllMonthly = async () => {
     setExporting(true)
-    const yearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
-    const lastDay = new Date(selectedYear, selectedMonth, 0).getDate()
-    const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`
-    
-    const { data: allowances } = await supabase
-      .from('allowances')
-      .select('*')
-      .gte('date', `${yearMonth}-01`)
-      .lte('date', endDate)
-      .order('user_email')
+    try {
+      console.log('Step 1: データ取得開始')
+      const yearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
+      const lastDay = new Date(selectedYear, selectedMonth, 0).getDate()
+      const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`
+      
+      const { data: allowances, error: fetchError } = await supabase
+        .from('allowances')
+        .select('*')
+        .gte('date', `${yearMonth}-01`)
+        .lte('date', endDate)
+        .order('user_email')
 
-    const userTotals: Record<string, { name: string, count: number, amount: number }> = {}
-    allowances?.forEach(item => {
-      if (!userTotals[item.user_email]) {
-        const user = users.find(u => u.email === item.user_email)
-        userTotals[item.user_email] = {
-          name: user?.display_name || item.user_email,
-          count: 0,
-          amount: 0
-        }
+      if (fetchError) {
+        throw new Error(`データ取得エラー: ${fetchError.message}`)
       }
-      userTotals[item.user_email].count++
-      userTotals[item.user_email].amount += item.amount
-    })
 
-    const excelData = Object.entries(userTotals).map(([email, data]) => ({
-      '職員名': data.name,
-      'メールアドレス': email,
-      '件数': data.count,
-      '金額': data.amount
-    }))
+      console.log('Step 2: データ取得完了', { count: allowances?.length || 0 })
 
-    const totalCount = excelData.reduce((sum, row) => sum + row['件数'], 0)
-    const totalAmount = excelData.reduce((sum, row) => sum + row['金額'], 0)
-    excelData.push({
-      '職員名': '合計',
-      'メールアドレス': '',
-      '件数': totalCount,
-      '金額': totalAmount
-    })
+      console.log('Step 3: ユーザー別集計計算開始')
+      const userTotals: Record<string, { name: string, count: number, amount: number }> = {}
+      (allowances || []).forEach(item => {
+        if (!item.user_email) return
+        if (!userTotals[item.user_email]) {
+          const user = users.find(u => u.email === item.user_email)
+          userTotals[item.user_email] = {
+            name: user?.display_name || item.user_email || '',
+            count: 0,
+            amount: 0
+          }
+        }
+        userTotals[item.user_email].count++
+        userTotals[item.user_email].amount += (item.amount ?? 0)
+      })
 
-    const ws = XLSX.utils.json_to_sheet(excelData)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, '全体集計')
-    
-    XLSX.writeFile(wb, `手当全体集計_${yearMonth}.xlsx`)
-    
-    setExporting(false)
-    alert('ダウンロードしました！')
+      console.log('Step 4: Excelデータ変換開始')
+      const excelData = Object.entries(userTotals).map(([email, data]) => ({
+        '職員名': data.name || '',
+        'メールアドレス': email || '',
+        '件数': data.count || 0,
+        '金額': data.amount || 0
+      }))
+
+      const totalCount = excelData.reduce((sum, row) => sum + (row['件数'] || 0), 0)
+      const totalAmount = excelData.reduce((sum, row) => sum + (row['金額'] || 0), 0)
+      excelData.push({
+        '職員名': '合計',
+        'メールアドレス': '',
+        '件数': totalCount,
+        '金額': totalAmount
+      })
+
+      console.log('Step 5: ExcelJSワークブック作成')
+      const ws = XLSX.utils.json_to_sheet(excelData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '全体集計')
+      
+      console.log('Step 6: ファイル書き出し開始')
+      XLSX.writeFile(wb, `手当全体集計_${yearMonth}.xlsx`)
+      
+      console.log('Step 7: ファイル書き出し完了')
+      alert('ダウンロードしました！')
+    } catch (error) {
+      console.error('Excel生成エラー:', error)
+      alert('Excel出力に失敗しました。詳細はコンソールを確認してください。')
+    } finally {
+      setExporting(false)
+    }
   }
 
   const exportAllYearly = async () => {
     setExporting(true)
-    
-    const { data: allowances } = await supabase
-      .from('allowances')
-      .select('*')
-      .gte('date', `${selectedYear}-01-01`)
-      .lte('date', `${selectedYear}-12-31`)
-      .order('user_email')
+    try {
+      console.log('Step 1: データ取得開始')
+      const { data: allowances, error: fetchError } = await supabase
+        .from('allowances')
+        .select('*')
+        .gte('date', `${selectedYear}-01-01`)
+        .lte('date', `${selectedYear}-12-31`)
+        .order('user_email')
 
-    const userTotals: Record<string, { name: string, count: number, amount: number }> = {}
-    allowances?.forEach(item => {
-      if (!userTotals[item.user_email]) {
-        const user = users.find(u => u.email === item.user_email)
-        userTotals[item.user_email] = {
-          name: user?.display_name || item.user_email,
-          count: 0,
-          amount: 0
-        }
+      if (fetchError) {
+        throw new Error(`データ取得エラー: ${fetchError.message}`)
       }
-      userTotals[item.user_email].count++
-      userTotals[item.user_email].amount += item.amount
-    })
 
-    const excelData = Object.entries(userTotals).map(([email, data]) => ({
-      '職員名': data.name,
-      'メールアドレス': email,
-      '件数': data.count,
-      '金額': data.amount
-    }))
+      console.log('Step 2: データ取得完了', { count: allowances?.length || 0 })
 
-    const totalCount = excelData.reduce((sum, row) => sum + row['件数'], 0)
-    const totalAmount = excelData.reduce((sum, row) => sum + row['金額'], 0)
-    excelData.push({
-      '職員名': '合計',
-      'メールアドレス': '',
-      '件数': totalCount,
-      '金額': totalAmount
-    })
+      console.log('Step 3: ユーザー別集計計算開始')
+      const userTotals: Record<string, { name: string, count: number, amount: number }> = {}
+      (allowances || []).forEach(item => {
+        if (!item.user_email) return
+        if (!userTotals[item.user_email]) {
+          const user = users.find(u => u.email === item.user_email)
+          userTotals[item.user_email] = {
+            name: user?.display_name || item.user_email || '',
+            count: 0,
+            amount: 0
+          }
+        }
+        userTotals[item.user_email].count++
+        userTotals[item.user_email].amount += (item.amount ?? 0)
+      })
 
-    const ws = XLSX.utils.json_to_sheet(excelData)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, '年間全体集計')
-    
-    XLSX.writeFile(wb, `手当年間全体集計_${selectedYear}.xlsx`)
-    
-    setExporting(false)
-    alert('ダウンロードしました！')
+      console.log('Step 4: Excelデータ変換開始')
+      const excelData = Object.entries(userTotals).map(([email, data]) => ({
+        '職員名': data.name || '',
+        'メールアドレス': email || '',
+        '件数': data.count || 0,
+        '金額': data.amount || 0
+      }))
+
+      const totalCount = excelData.reduce((sum, row) => sum + (row['件数'] || 0), 0)
+      const totalAmount = excelData.reduce((sum, row) => sum + (row['金額'] || 0), 0)
+      excelData.push({
+        '職員名': '合計',
+        'メールアドレス': '',
+        '件数': totalCount,
+        '金額': totalAmount
+      })
+
+      console.log('Step 5: ExcelJSワークブック作成')
+      const ws = XLSX.utils.json_to_sheet(excelData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '年間全体集計')
+      
+      console.log('Step 6: ファイル書き出し開始')
+      XLSX.writeFile(wb, `手当年間全体集計_${selectedYear}.xlsx`)
+      
+      console.log('Step 7: ファイル書き出し完了')
+      alert('ダウンロードしました！')
+    } catch (error) {
+      console.error('Excel生成エラー:', error)
+      alert('Excel出力に失敗しました。詳細はコンソールを確認してください。')
+    } finally {
+      setExporting(false)
+    }
   }
 
   if (!isAuthorized) return <div className="p-10 text-center">確認中...</div>
