@@ -15,6 +15,15 @@ type Allowance = {
   destination_detail: string
 }
 
+/** Supabase allowances 行（select('*') の戻り値で user_email を含む） */
+type AllowanceRow = {
+  user_email?: string | null
+  amount?: number | null
+  date?: string
+  activity_type?: string
+  [key: string]: unknown
+}
+
 export default function AllowanceManagementPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -345,30 +354,40 @@ export default function AllowanceManagementPage() {
 
       console.log('Step 3: ユーザー別集計計算開始')
       const userTotals: Record<string, { name: string, count: number, amount: number }> = {}
-      (allowances || []).forEach(item => {
-        if (!item.user_email) return
-        if (!userTotals[item.user_email]) {
-          const user = users.find(u => u.email === item.user_email)
-          userTotals[item.user_email] = {
-            name: user?.display_name || item.user_email || '',
+      const rawAllowances: AllowanceRow[] = allowances ?? []
+      for (const item of rawAllowances) {
+        const email = item?.user_email
+        if (!email || typeof email !== 'string') continue
+        if (!userTotals[email]) {
+          const user = users.find((u: { email?: string }) => u?.email === email)
+          userTotals[email] = {
+            name: user?.display_name || email || '',
             count: 0,
             amount: 0
           }
         }
-        userTotals[item.user_email].count++
-        userTotals[item.user_email].amount += (item.amount ?? 0)
-      })
+        userTotals[email].count++
+        userTotals[email].amount += (item?.amount ?? 0)
+      }
 
       console.log('Step 4: Excelデータ変換開始')
-      const excelData = Object.entries(userTotals).map(([email, data]) => ({
-        '職員名': data.name || '',
-        'メールアドレス': email || '',
-        '件数': data.count || 0,
-        '金額': data.amount || 0
-      }))
+      const excelData: Array<{ '職員名': string; 'メールアドレス': string; '件数': number; '金額': number }> = []
+      let totalCount = 0
+      let totalAmount = 0
+      for (const email in userTotals) {
+        const data = userTotals[email]
+        const count = data?.count ?? 0
+        const amount = data?.amount ?? 0
+        totalCount += count
+        totalAmount += amount
+        excelData.push({
+          '職員名': data?.name ?? '',
+          'メールアドレス': email,
+          '件数': count,
+          '金額': amount
+        })
+      }
 
-      const totalCount = excelData.reduce((sum, row) => sum + (row['件数'] || 0), 0)
-      const totalAmount = excelData.reduce((sum, row) => sum + (row['金額'] || 0), 0)
       excelData.push({
         '職員名': '合計',
         'メールアドレス': '',

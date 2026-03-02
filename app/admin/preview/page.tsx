@@ -150,8 +150,9 @@ export default function AllowancePreviewPage() {
       <div className="space-y-6">
         {Array.from(userMap.entries()).map(([userId, { profile, allowances: userAllowances }]) => {
           const total = userAllowances.reduce((sum, a) => sum + a.amount, 0)
-          const displayName = profile?.display_name || profile?.email || 'ユーザー名未登録'
-          const displayEmail = profile?.email || ''
+          const fallbackEmail = userAllowances[0]?.user_email ?? ''
+          const displayName = profile?.display_name ?? profile?.email ?? (fallbackEmail ? `氏名未登録（${fallbackEmail}）` : 'ユーザー名未登録')
+          const displayEmail = profile?.email ?? fallbackEmail ?? ''
           
           return (
             <div key={userId} className="bg-white rounded-2xl shadow-lg overflow-hidden">
@@ -163,7 +164,7 @@ export default function AllowancePreviewPage() {
                     {displayEmail && <p className="text-sm opacity-90">{displayEmail}</p>}
                     {!profile?.display_name && (
                       <p className="text-xs opacity-75 mt-1 bg-yellow-500/30 px-2 py-1 rounded inline-block">
-                        ⚠️ 氏名未登録
+                        ⚠️ {fallbackEmail ? `氏名未登録（${fallbackEmail}）` : '氏名未登録'}
                       </p>
                     )}
                   </div>
@@ -290,7 +291,7 @@ export default function AllowancePreviewPage() {
                 
                 return dateAllowances.map((allowance, index) => {
                   const user = users.find(u => u.user_id === allowance.user_id)
-                  const displayName = user?.display_name || user?.email || allowance.user_email
+                  const displayName = user?.display_name ?? user?.email ?? (allowance?.user_email ? `氏名未登録（${allowance.user_email}）` : 'ユーザー名未登録')
                   
                   // destination_type の表示判定
                   const hasDestination = allowance.is_driving && 
@@ -405,7 +406,7 @@ export default function AllowancePreviewPage() {
                 <option value="">全職員</option>
                 {users.map(user => (
                   <option key={user.user_id} value={user.user_id}>
-                    {user.display_name || user.email || 'ユーザー名未登録'}
+                    {user.display_name ?? user.email ?? `氏名未登録（${user.email ?? ''}）`}
                   </option>
                 ))}
               </select>
