@@ -5,12 +5,9 @@ import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-/** 結合された user_profiles（JOIN で取得する場合） */
+/** 結合された user_profiles（JOIN で取得する場合）。主キーは user_id、氏名は display_name。 */
 type UserProfileJoined = {
-  id?: number
   user_id?: string
-  email?: string
-  name?: string
   display_name?: string
 } | null
 
@@ -102,10 +99,7 @@ export default function AllowancePreviewPage() {
         .select(`
           *,
           user_profiles (
-            id,
             user_id,
-            email,
-            name,
             display_name
           )
         `)
@@ -190,9 +184,9 @@ export default function AllowancePreviewPage() {
           const total = userAllowances.reduce((sum, a) => sum + a.amount, 0)
           const joined = userAllowances[0]?.user_profiles
           const fallbackEmail = userAllowances[0]?.user_email ?? ''
-          // 結合した user_profiles の display_name / name を優先、なければ profile（別取得）、最後に user_email
-          const displayName = (joined?.display_name ?? joined?.name) ?? profile?.display_name ?? profile?.email ?? (fallbackEmail ? `氏名未登録（${fallbackEmail}）` : 'ユーザー名未登録')
-          const displayEmail = joined?.email ?? profile?.email ?? fallbackEmail ?? ''
+          // 結合した user_profiles.display_name を優先、なければ profile、最後に user_email フォールバック
+          const displayName = joined?.display_name ?? profile?.display_name ?? profile?.email ?? (fallbackEmail ? `氏名未登録（${fallbackEmail}）` : 'ユーザー名未登録')
+          const displayEmail = profile?.email ?? fallbackEmail ?? ''
           
           return (
             <div key={userId} className="bg-white rounded-2xl shadow-lg overflow-hidden">
@@ -202,7 +196,7 @@ export default function AllowancePreviewPage() {
                   <div>
                     <h3 className="text-xl font-bold">{displayName}</h3>
                     {displayEmail && <p className="text-sm opacity-90">{displayEmail}</p>}
-                    {!(joined?.display_name ?? joined?.name ?? profile?.display_name) && (
+                    {!(joined?.display_name ?? profile?.display_name) && (
                       <p className="text-xs opacity-75 mt-1 bg-yellow-500/30 px-2 py-1 rounded inline-block">
                         ⚠️ {fallbackEmail ? `氏名未登録（${fallbackEmail}）` : '氏名未登録'}
                       </p>
@@ -332,7 +326,7 @@ export default function AllowancePreviewPage() {
                 return dateAllowances.map((allowance, index) => {
                   const user = users.find(u => u.user_id === allowance.user_id)
                   const joined = allowance?.user_profiles
-                  const displayName = (joined?.display_name ?? joined?.name) ?? user?.display_name ?? user?.email ?? (allowance?.user_email ? `氏名未登録（${allowance.user_email}）` : 'ユーザー名未登録')
+                  const displayName = joined?.display_name ?? user?.display_name ?? user?.email ?? (allowance?.user_email ? `氏名未登録（${allowance.user_email}）` : 'ユーザー名未登録')
                   
                   // destination_type の表示判定
                   const hasDestination = allowance.is_driving && 
