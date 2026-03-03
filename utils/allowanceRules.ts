@@ -38,8 +38,11 @@ export const calculateAmountFromMaster = (
     isWorkDay: boolean,
     isAccommodation: boolean = false,
     isHalfDay: boolean = false,
-    allowanceTypes: { code: string, base_amount: number }[] = []
+    allowanceTypes: { code: string, base_amount: number }[] = [],
+    isLongBreak: boolean = false
 ): number => {
+    // 長期休業中は「勤務日だが休日と同等」として扱う（平日減額しない）
+    const effectiveWorkDay = isLongBreak ? false : isWorkDay
     // マスタから基本金額を取得
     const getMasterAmount = (code: string): number => {
         return allowanceTypes.find(t => t.code === code)?.base_amount || 0
@@ -57,12 +60,9 @@ export const calculateAmountFromMaster = (
         
         // 県外への運転: 15,000円（活動タイプに関係なく）
         if (destinationId === 'outside') {
-            // 遠征（E）の場合は運転手当のみ、休日手当を含まない
-            // 平日の場合は2,400円を引く
             if (activityId === 'E') {
-                return isWorkDay ? 15000 - 2400 : 15000
+                return effectiveWorkDay ? 15000 - 2400 : 15000
             }
-            // 合宿（F）で宿泊ありの場合のみ加算
             return isAccommodation && activityId === 'F' 
                 ? 15000 + (baseAmount > 0 ? baseAmount : 2400) 
                 : 15000
@@ -70,12 +70,9 @@ export const calculateAmountFromMaster = (
         
         // 県内120km以上への運転: 7,500円（活動タイプに関係なく）
         if (destinationId === 'inside_long') {
-            // 遠征（E）の場合は運転手当のみ、休日手当を含まない
-            // 平日の場合は2,400円を引く
             if (activityId === 'E') {
-                return isWorkDay ? 7500 - 2400 : 7500
+                return effectiveWorkDay ? 7500 - 2400 : 7500
             }
-            // 合宿（F）で宿泊ありの場合のみ加算
             return isAccommodation && activityId === 'F' 
                 ? 7500 + (baseAmount > 0 ? baseAmount : 2400) 
                 : 7500
@@ -83,25 +80,20 @@ export const calculateAmountFromMaster = (
         
         // 管内または校内への運転
         if (destinationId === 'inside_short' || destinationId === 'school') {
-            // C. 指定大会の場合: 基本金額のみ
             if (activityId === 'C') {
                 return baseAmount > 0 ? baseAmount : 3400
             }
             
-            // E. 遠征の場合: 平日は運転手当から2,400円を引く、休日は2,400円のみ
             if (activityId === 'E') {
-                if (isWorkDay) {
-                    // 平日: 管内運転5,100円 - 2,400円 = 2,700円
+                if (effectiveWorkDay) {
                     return 2700
                 } else {
-                    // 休日: 2,400円のみ（運転手当を含む）
                     return 2400
                 }
             }
             
-            // F. 合宿の場合: 勤務日は5100円（校内合宿なので運転なし）
             if (activityId === 'F') {
-                if (isWorkDay) {
+                if (effectiveWorkDay) {
                     const insideDrivingAmount = 5100
                     return isAccommodation 
                         ? insideDrivingAmount + (baseAmount > 0 ? baseAmount : 2400) 
@@ -119,17 +111,15 @@ export const calculateAmountFromMaster = (
         return baseAmount > 0 ? baseAmount : 2400
     }
 
-    // その他の活動種別（既存ロジック）
+    // A/B: 平日でも金額をそのまま支給（0円リセット廃止）
     if (activityId === 'A') {
-        if (isWorkDay) return 0
         const aAmount = getMasterAmount('A')
-        return aAmount > 0 ? aAmount : 2400 // フォールバック
+        return aAmount > 0 ? aAmount : 2400
     }
 
     if (activityId === 'B') {
-        if (isWorkDay) return 0
         const bAmount = getMasterAmount('B')
-        return bAmount > 0 ? bAmount : 1700 // フォールバック
+        return bAmount > 0 ? bAmount : 1700
     }
 
     if (activityId === 'C') {
@@ -172,19 +162,19 @@ export const calculateAmount = (
     destinationId: string,
     isWorkDay: boolean,
     isAccommodation: boolean = false,
-    isHalfDay: boolean = false
+    isHalfDay: boolean = false,
+    isLongBreak: boolean = false
 ): number => {
+    const effectiveWorkDay = isLongBreak ? false : isWorkDay
     // ===========================================
     // 【最優先】運転ありの場合の特別ルール
     // ===========================================
     if (isDriving) {
         // 県外への運転は一律 15,000円（活動タイプに関係なく）
         if (destinationId === 'outside') {
-            // 遠征（E）の場合は運転手当のみ、平日は2,400円を引く
             if (activityId === 'E') {
-                return isWorkDay ? 15000 - 2400 : 15000
+                return effectiveWorkDay ? 15000 - 2400 : 15000
             }
-            // 合宿（F）で宿泊がある場合のみ加算
             if (isAccommodation && activityId === 'F') {
                 return 15000 + 2400
             }
@@ -193,11 +183,9 @@ export const calculateAmount = (
         
         // 県内（120km以上）への運転は一律 7,500円
         if (destinationId === 'inside_long') {
-            // 遠征（E）の場合は運転手当のみ、平日は2,400円を引く
             if (activityId === 'E') {
-                return isWorkDay ? 7500 - 2400 : 7500
+                return effectiveWorkDay ? 7500 - 2400 : 7500
             }
-            // 合宿（F）で宿泊がある場合のみ加算
             if (isAccommodation && activityId === 'F') {
                 return 7500 + 2400
             }
@@ -206,37 +194,28 @@ export const calculateAmount = (
         
         // 管内または校内運転の場合は、活動タイプごとのルールに従う
         if (destinationId === 'inside_short' || destinationId === 'school') {
-            // C. 指定大会の場合
             if (activityId === 'C') {
                 return 3400
             }
             
-            // E. 遠征の場合: 平日は運転手当から2,400円を引く
             if (activityId === 'E') {
-                if (isWorkDay) {
-                    // 平日: 5,100円 - 2,400円 = 2,700円
+                if (effectiveWorkDay) {
                     return 2700
                 } else {
-                    // 休日: 2,400円のみ（運転手当を含む）
                     return 2400
                 }
             }
             
-            // F. 合宿の場合
             if (activityId === 'F') {
-                if (isWorkDay) {
-                    // 勤務日の管内運転
+                if (effectiveWorkDay) {
                     if (isAccommodation) {
                         return 5100 + 2400
                     }
                     return 5100
                 } else {
-                    // 休日の管内運転
                     return 2400
                 }
             }
-            
-            // その他の活動で管内運転の場合、基本額を適用
         }
     }
     
@@ -244,22 +223,20 @@ export const calculateAmount = (
     // 運転なしの場合の処理
     // ===========================================
     
-    // A. 休日部活（1日）
+    // A. 休日部活（1日）— 平日でも金額支給（0円リセット廃止）
     if (activityId === 'A') {
-        if (isWorkDay) return 0
         return 2400
     }
 
-    // B. 休日部活（半日）
+    // B. 休日部活（半日）— 平日でも金額支給（0円リセット廃止）
     if (activityId === 'B') {
-        if (isWorkDay) return 0
         return 1700
     }
 
     // C. 指定大会（対外運動競技等引率）
     if (activityId === 'C') {
         if (isHalfDay) return 1700
-        return 3400 // 運転なしの基本額
+        return 3400
     }
 
     // D. 指定外大会
@@ -269,11 +246,9 @@ export const calculateAmount = (
 
     // E. 遠征 / F. 合宿（運転なしの場合）
     if (activityId === 'E' || activityId === 'F') {
-        if (isWorkDay) {
-            // 勤務日は宿泊のみ支給
+        if (effectiveWorkDay) {
             return isAccommodation ? 2400 : 0
         } else {
-            // 休日は基本額
             return 2400
         }
     }

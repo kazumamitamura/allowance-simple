@@ -152,6 +152,7 @@ export default function Home() {
   const [competitionName, setCompetitionName] = useState('') // 大会名（指定大会時）
   const [isDriving, setIsDriving] = useState(false)
   const [isAccommodation, setIsAccommodation] = useState(false)
+  const [isLongBreak, setIsLongBreak] = useState(false)
   const [calculatedAmount, setCalculatedAmount] = useState(0)
   const [customAmount, setCustomAmount] = useState(0)
   const [customDescription, setCustomDescription] = useState('')
@@ -565,6 +566,7 @@ export default function Home() {
     console.log('isDriving:', isDriving)
     console.log('destinationId:', destinationId)
     console.log('isAccommodation:', isAccommodation)
+    console.log('isLongBreak:', isLongBreak)
     console.log('allowanceTypes件数:', allowanceTypes.length)
     
     // 休日判定: dayTypeに'休日'が含まれる場合は休日、それ以外は勤務日
@@ -592,15 +594,14 @@ export default function Home() {
     }
     
     const isHalfDay = false
-    // マスタ参照計算を優先、マスタがない場合は従来ロジック
     const amt = allowanceTypes.length > 0 
-      ? calculateAmountFromMaster(activityId, isDriving, destinationId, isWorkDay, isAccommodation, isHalfDay, allowanceTypes)
-      : calculateAmount(activityId, isDriving, destinationId, isWorkDay, isAccommodation, isHalfDay)
+      ? calculateAmountFromMaster(activityId, isDriving, destinationId, isWorkDay, isAccommodation, isHalfDay, allowanceTypes, isLongBreak)
+      : calculateAmount(activityId, isDriving, destinationId, isWorkDay, isAccommodation, isHalfDay, isLongBreak)
     
     console.log('計算結果:', amt, '円')
     console.log('=== 支給予定額の計算終了 ===')
     setCalculatedAmount(amt)
-  }, [activityId, isDriving, destinationId, dayType, isAccommodation, allowanceTypes, customAmount])
+  }, [activityId, isDriving, destinationId, dayType, isAccommodation, isLongBreak, allowanceTypes, customAmount])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -657,7 +658,8 @@ export default function Home() {
           destination_type: DESTINATIONS.find(d => d.id === destinationId)?.label, 
           destination_detail: detailValue, 
           is_driving: isDriving, 
-          is_accommodation: isAccommodation, 
+          is_accommodation: isAccommodation,
+          is_long_break: isLongBreak,
           amount: calculatedAmount
         }
         
@@ -1370,8 +1372,8 @@ export default function Home() {
                     </div>
                     )}
                     
-                    {/* 運転・宿泊フラグ */}
-                    <div className="grid grid-cols-2 gap-3 mt-4">
+                    {/* 運転・宿泊・長期休業フラグ */}
+                    <div className="grid grid-cols-3 gap-3 mt-4">
                         {/* F（校内合宿）の場合は運転なし */}
                         {activityId !== 'F' && (
                             <label className={`p-4 rounded-xl cursor-pointer border-2 text-center text-sm font-bold transition-all shadow-sm hover:shadow-md ${isDriving ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 shadow-blue-200' : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400 hover:bg-slate-50'}`}>
@@ -1404,6 +1406,17 @@ export default function Home() {
                             <div className="text-2xl mb-1">🏨</div>
                             <div>宿泊あり</div>
                         </label>
+                        <label className={`p-4 rounded-xl cursor-pointer border-2 text-center text-sm font-bold transition-all shadow-sm hover:shadow-md ${isLongBreak ? 'border-orange-500 bg-gradient-to-br from-orange-50 to-orange-100 text-orange-700 shadow-orange-200' : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400 hover:bg-slate-50'}`}>
+                            <input 
+                                disabled={isAllowLocked} 
+                                type="checkbox" 
+                                checked={isLongBreak} 
+                                onChange={e => setIsLongBreak(e.target.checked)} 
+                                className="hidden" 
+                            />
+                            <div className="text-2xl mb-1">🌴</div>
+                            <div>長期休業</div>
+                        </label>
                     </div>
                     
                     {/* 計算ロジック説明 */}
@@ -1416,17 +1429,25 @@ export default function Home() {
                         </div>
                         <div className="text-xs sm:text-sm text-slate-700 font-bold bg-white p-3 rounded-lg border border-blue-200">
                             {(() => {
-                                // 休日判定: dayTypeに'休日'が含まれる場合は休日、それ以外は勤務日
                                 const isWorkDay = !dayType.includes('休日') && (dayType.includes('勤務日') || dayType.includes('授業'))
+                                const effectiveWorkDay = isLongBreak ? false : isWorkDay
+                                const longBreakNote = isLongBreak && isWorkDay ? '（長期休業）' : ''
                                 
-                                // 運転ありの場合の最優先ルール
                                 if (isDriving) {
                                     if (destinationId === 'outside') {
+                                        if (activityId === 'E') {
+                                            const amt = effectiveWorkDay ? 15000 - 2400 : 15000
+                                            return `【運転】県外${longBreakNote}: ${amt.toLocaleString()}円`
+                                        }
                                         const baseAmount = 15000
                                         const total = isAccommodation && (activityId === 'E' || activityId === 'F') ? baseAmount + 2400 : baseAmount
                                         return `【運転】県外: ${total.toLocaleString()}円${isAccommodation ? ' (運転15,000円＋宿泊2,400円)' : ''}`
                                     }
                                     if (destinationId === 'inside_long') {
+                                        if (activityId === 'E') {
+                                            const amt = effectiveWorkDay ? 7500 - 2400 : 7500
+                                            return `【運転】県内120km以上${longBreakNote}: ${amt.toLocaleString()}円`
+                                        }
                                         const baseAmount = 7500
                                         const total = isAccommodation && (activityId === 'E' || activityId === 'F') ? baseAmount + 2400 : baseAmount
                                         return `【運転】県内120km以上: ${total.toLocaleString()}円${isAccommodation ? ' (運転7,500円＋宿泊2,400円)' : ''}`
@@ -1434,24 +1455,23 @@ export default function Home() {
                                     if (destinationId === 'inside_short' || destinationId === 'school') {
                                         if (activityId === 'C') return '【運転】指定大会（管内）: 3,400円'
                                         if (activityId === 'E' || activityId === 'F') {
-                                            if (isWorkDay) {
+                                            if (effectiveWorkDay) {
                                                 return isAccommodation ? '【運転】勤務日（管内＋宿泊）: 7,500円' : '【運転】勤務日（管内）: 5,100円'
                                             }
-                                            return '【運転】休日（管内）: 2,400円'
+                                            return `【運転】休日${longBreakNote}（管内）: 2,400円`
                                         }
                                     }
                                 }
                                 
-                                // 運転なしの場合
-                                if (activityId === 'A') return '休日部活(1日): 2,400円'
-                                if (activityId === 'B') return '休日部活(半日): 1,700円'
+                                if (activityId === 'A') return `休日部活(1日)${longBreakNote}: 2,400円`
+                                if (activityId === 'B') return `休日部活(半日)${longBreakNote}: 1,700円`
                                 if (activityId === 'C') return '指定大会（運転なし）: 3,400円'
                                 if (activityId === 'D') return '指定外大会: 2,400円'
                                 if (activityId === 'E' || activityId === 'F') {
-                                    if (isWorkDay) {
+                                    if (effectiveWorkDay) {
                                         return isAccommodation ? '勤務日（宿泊のみ）: 2,400円' : '勤務日（運転なし）: 0円'
                                     }
-                                    return '休日（運転なし）: 2,400円'
+                                    return `休日${longBreakNote}（運転なし）: 2,400円`
                                 }
                                 if (activityId === 'G') return '研修旅行等引率: 3,400円'
                                 if (activityId === 'H') return '宿泊指導: 2,400円'
