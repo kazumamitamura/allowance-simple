@@ -7,9 +7,12 @@ import { useRouter } from 'next/navigation'
 import Calendar from 'react-calendar'
 import 'react-calendar/dist/Calendar.css'
 import { ACTIVITY_TYPES, DESTINATIONS, calculateAmount, calculateAmountFromMaster, canSelectActivity } from '@/utils/allowanceRules'
+import { isAdmin as checkIsAdminRole } from '@/utils/adminRoles'
 import { logout } from './auth/actions'
 
 const ADMIN_EMAILS = ['mitamuraka@haguroko.ed.jp', 'tomonoem@haguroko.ed.jp'].map(e => e.toLowerCase())
+
+type MonthlyStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED'
 
 type Allowance = { 
   id: number
@@ -157,8 +160,12 @@ export default function Home() {
   const [customAmount, setCustomAmount] = useState(0)
   const [customDescription, setCustomDescription] = useState('')
 
-  // 承認システム廃止のため、編集ロックは常に解除
-  const isAllowLocked = false
+  // 月次申請ステータス
+  const [monthlyStatus, setMonthlyStatus] = useState<MonthlyStatus>('DRAFT')
+  const [submittingStatus, setSubmittingStatus] = useState(false)
+
+  // 管理者は常に編集可能、一般ユーザーは SUBMITTED/APPROVED 時にロック
+  const isAllowLocked = (monthlyStatus === 'SUBMITTED' || monthlyStatus === 'APPROVED') && !isAdmin
 
   useEffect(() => {
     const init = async () => {
@@ -172,7 +179,8 @@ export default function Home() {
       console.log('ユーザー認証成功:', user.email)
       setUserEmail(user.email || '')
       setUserId(user.id)
-      if (ADMIN_EMAILS.includes(user.email?.toLowerCase() || '')) {
+      const emailLower = user.email?.toLowerCase() || ''
+      if (ADMIN_EMAILS.includes(emailLower) || checkIsAdminRole(emailLower)) {
         setIsAdmin(true)
         console.log('管理者権限あり')
       }
@@ -181,11 +189,13 @@ export default function Home() {
       await fetchProfile(user.id)
 
       // データ取得（並行実行）
+      const now = new Date()
       await Promise.all([
         fetchData(user.id),
         fetchSchoolCalendar(),
         fetchAnnualSchedules(),
         fetchAllowanceTypes(),
+        fetchMonthlyStatus(user.id, now.getFullYear(), now.getMonth() + 1),
       ])
       
       console.log('=== 初期化完了 ===')
@@ -304,6 +314,60 @@ export default function Home() {
           await fetchProfile(userId)
           alert('氏名を登録しました！')
       }
+  }
+
+  // 月次申請ステータス取得
+  const fetchMonthlyStatus = async (uid: string, year: number, month: number) => {
+    const targetMonth = `${year}-${String(month).padStart(2, '0')}`
+    const { data, error } = await supabase
+      .from('allowance_monthly_statuses')
+      .select('status')
+      .eq('user_id', uid)
+      .eq('target_month', targetMonth)
+      .single()
+    if (error || !data) {
+      setMonthlyStatus('DRAFT')
+    } else {
+      setMonthlyStatus((data.status as MonthlyStatus) || 'DRAFT')
+    }
+  }
+
+  // 月が変わったらステータスを再取得
+  useEffect(() => {
+    if (!userId) return
+    const year = selectedDate.getFullYear()
+    const month = selectedDate.getMonth() + 1
+    fetchMonthlyStatus(userId, year, month)
+  }, [selectedDate.getFullYear(), selectedDate.getMonth(), userId])
+
+  // 「申請する」ボタン処理
+  const handleSubmitMonth = async () => {
+    if (!userId) return
+    if (!confirm('この月の手当を申請しますか？\n申請後は承認されるか返却されるまで編集できなくなります。')) return
+    setSubmittingStatus(true)
+    try {
+      const year = selectedDate.getFullYear()
+      const month = selectedDate.getMonth() + 1
+      const targetMonth = `${year}-${String(month).padStart(2, '0')}`
+      const { error } = await supabase
+        .from('allowance_monthly_statuses')
+        .upsert({
+          user_id: userId,
+          target_month: targetMonth,
+          status: 'SUBMITTED'
+        }, { onConflict: 'user_id,target_month' })
+      if (error) {
+        console.error('申請エラー:', error)
+        alert('申請に失敗しました: ' + error.message)
+      } else {
+        setMonthlyStatus('SUBMITTED')
+        alert('申請しました。管理者の承認をお待ちください。')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('申請処理中にエラーが発生しました。')
+    }
+    setSubmittingStatus(false)
   }
 
   // 月次集計の自動計算
@@ -836,6 +900,10 @@ export default function Home() {
   }
 
   const handleDelete = async (id: number, dateStr: string) => { 
+    if (isAllowLocked) {
+      alert('現在この月は編集できません。')
+      return
+    }
     if (!window.confirm('削除しますか？')) return
     const { error } = await supabase.from('allowances').delete().eq('id', id)
     if (!error) fetchData(userId)
@@ -865,6 +933,10 @@ export default function Home() {
   
   // カレンダー日付クリック時の処理
   const handleDateClick = (date: Date, event?: React.MouseEvent) => {
+    if (isAllowLocked) {
+      alert(monthlyStatus === 'SUBMITTED' ? '申請中のため編集できません。返却後に編集してください。' : '承認済のため編集できません。')
+      return
+    }
     // 複数選択モード（PC: Ctrl/Cmd押下、スマホ: 複数選択モード有効）
     const isMultiSelect = isMultiSelectMode || event?.ctrlKey || event?.metaKey
     
@@ -998,14 +1070,37 @@ export default function Home() {
                 <button onClick={handleNextMonth} className="text-slate-400 hover:text-slate-600 p-2 sm:p-2 text-xl sm:text-2xl font-bold transition touch-manipulation">›</button>
               </div>
               
-              {/* 支給予定額 */}
+              {/* 支給予定額 + 申請ステータス */}
               <div className="flex flex-col items-start w-full sm:w-auto">
-                <div className="text-xs sm:text-sm text-gray-600 font-medium">支給予定額</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-xs sm:text-sm text-gray-600 font-medium">支給予定額</div>
+                  {monthlyStatus === 'DRAFT' && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-gray-100 text-gray-600 border border-gray-300">未申請</span>
+                  )}
+                  {monthlyStatus === 'SUBMITTED' && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-yellow-100 text-yellow-700 border border-yellow-300">申請中</span>
+                  )}
+                  {monthlyStatus === 'APPROVED' && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-green-100 text-green-700 border border-green-300">承認済</span>
+                  )}
+                </div>
                 <div className="text-2xl sm:text-3xl font-extrabold text-blue-600">¥{monthTotal.toLocaleString()}</div>
                 <div className="flex gap-2 sm:gap-3 mt-1 text-xs text-gray-600">
                   <span>🏕️ 合宿: {campDays}日</span>
                   <span>🚌 遠征: {expeditionDays}日</span>
                 </div>
+                {monthlyStatus === 'DRAFT' && monthTotal > 0 && (
+                  <button
+                    onClick={handleSubmitMonth}
+                    disabled={submittingStatus}
+                    className="mt-2 text-xs font-bold px-4 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 active:from-emerald-700 active:to-emerald-800 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {submittingStatus ? '申請中...' : '💰 この月の手当を申請する'}
+                  </button>
+                )}
+                {isAllowLocked && (
+                  <div className="mt-1 text-xs text-orange-600 font-bold">🔒 {monthlyStatus === 'SUBMITTED' ? '申請中のため編集できません' : '承認済のため編集できません'}</div>
+                )}
               </div>
             </div>
             

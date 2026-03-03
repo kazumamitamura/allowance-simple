@@ -334,6 +334,25 @@ export default function AdminDashboard() {
 
         {/* 追加メニュー */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {/* 承認・返却管理 */}
+          <button 
+            onClick={() => router.push('/admin/approvals')}
+            className="bg-gradient-to-br from-amber-500 to-amber-600 p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all text-left group transform hover:scale-105"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="text-5xl">✅</div>
+            </div>
+            <h3 className="text-2xl font-extrabold text-white mb-2">
+              承認・返却管理
+            </h3>
+            <p className="text-amber-100 text-xs mb-3">
+              月次手当の申請承認・返却
+            </p>
+            <div className="text-xs text-amber-200 bg-amber-700/30 px-2 py-1 rounded-lg inline-block">
+              管理者専用
+            </div>
+          </button>
+
           {/* お問い合わせ管理 */}
           <button 
             onClick={() => router.push('/admin/inquiries')}
