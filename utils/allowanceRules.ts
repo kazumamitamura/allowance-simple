@@ -14,11 +14,44 @@ export const ACTIVITY_TYPES = [
   ]
   
 export const DESTINATIONS = [
-    { id: 'school', label: '校内' },
-    { id: 'inside_short', label: '管内（庄内・新庄最上）' },
-    { id: 'inside_long', label: '県内（片道120km以上）' },
-    { id: 'outside', label: '県外' },
+    { id: 'inside_shonai_mogami', label: '120km未満（庄内・最上）' },
+    { id: 'inside_murayama_okitama', label: '120㎞未満（村山・置賜含む）' },
+    { id: 'distance_120_500', label: '120㎞～500㎞未満' },
+    { id: 'distance_500_plus', label: '500㎞以上' },
 ]
+
+/** 旧ID・旧ラベルを新IDへ変換（既存データの後方互換） */
+export const mapLegacyDestinationId = (idOrLabel: string): string => {
+    const byLabel = DESTINATIONS.find(d => d.label === idOrLabel)?.id
+    if (byLabel) return byLabel
+
+    const legacyMap: Record<string, string> = {
+        inside_short: 'inside_shonai_mogami',
+        school: 'inside_shonai_mogami',
+        kannai: 'inside_shonai_mogami',
+        kennai_short: 'inside_shonai_mogami',
+        inside_long: 'distance_120_500',
+        kennai_long: 'distance_120_500',
+        outside: 'distance_500_plus',
+        kengai: 'distance_500_plus',
+        '管内（庄内・新庄最上）': 'inside_shonai_mogami',
+        '校内': 'inside_shonai_mogami',
+        '県内（片道120km以上）': 'distance_120_500',
+        '県外': 'distance_500_plus',
+    }
+    return legacyMap[idOrLabel] || idOrLabel || 'inside_shonai_mogami'
+}
+
+/** 運転手当が高額になる距離区分（目的地入力が必要） */
+export const isLongDistanceDestination = (destinationId: string): boolean => {
+    const id = mapLegacyDestinationId(destinationId)
+    return id === 'distance_120_500' || id === 'distance_500_plus'
+}
+
+const isShortDistanceDestination = (destinationId: string): boolean => {
+    const id = mapLegacyDestinationId(destinationId)
+    return id === 'inside_shonai_mogami' || id === 'inside_murayama_okitama'
+}
 
 /**
  * マスタ参照型の手当金額計算（新版）
@@ -56,10 +89,11 @@ export const calculateAmountFromMaster = (
 
     // 運転ありの場合の特別ルール（最優先）
     if (isDriving) {
+        const destId = mapLegacyDestinationId(destinationId)
         const baseAmount = activityId === 'C' ? getMasterAmount('C') : getMasterAmount(activityId)
         
-        // 県外への運転: 15,000円（活動タイプに関係なく）
-        if (destinationId === 'outside') {
+        // 500㎞以上への運転: 15,000円（活動タイプに関係なく）
+        if (destId === 'distance_500_plus') {
             if (activityId === 'E') {
                 return effectiveWorkDay ? 15000 - 2400 : 15000
             }
@@ -68,8 +102,8 @@ export const calculateAmountFromMaster = (
                 : 15000
         }
         
-        // 県内120km以上への運転: 7,500円（活動タイプに関係なく）
-        if (destinationId === 'inside_long') {
+        // 120㎞～500㎞未満への運転: 7,500円（活動タイプに関係なく）
+        if (destId === 'distance_120_500') {
             if (activityId === 'E') {
                 return effectiveWorkDay ? 7500 - 2400 : 7500
             }
@@ -78,8 +112,8 @@ export const calculateAmountFromMaster = (
                 : 7500
         }
         
-        // 管内または校内への運転
-        if (destinationId === 'inside_short' || destinationId === 'school') {
+        // 120km未満（庄内・最上 / 村山・置賜含む）への運転
+        if (isShortDistanceDestination(destId)) {
             if (activityId === 'C') {
                 return baseAmount > 0 ? baseAmount : 3400
             }
@@ -170,8 +204,10 @@ export const calculateAmount = (
     // 【最優先】運転ありの場合の特別ルール
     // ===========================================
     if (isDriving) {
-        // 県外への運転は一律 15,000円（活動タイプに関係なく）
-        if (destinationId === 'outside') {
+        const destId = mapLegacyDestinationId(destinationId)
+
+        // 500㎞以上への運転は一律 15,000円（活動タイプに関係なく）
+        if (destId === 'distance_500_plus') {
             if (activityId === 'E') {
                 return effectiveWorkDay ? 15000 - 2400 : 15000
             }
@@ -181,8 +217,8 @@ export const calculateAmount = (
             return 15000
         }
         
-        // 県内（120km以上）への運転は一律 7,500円
-        if (destinationId === 'inside_long') {
+        // 120㎞～500㎞未満への運転は一律 7,500円
+        if (destId === 'distance_120_500') {
             if (activityId === 'E') {
                 return effectiveWorkDay ? 7500 - 2400 : 7500
             }
@@ -192,8 +228,8 @@ export const calculateAmount = (
             return 7500
         }
         
-        // 管内または校内運転の場合は、活動タイプごとのルールに従う
-        if (destinationId === 'inside_short' || destinationId === 'school') {
+        // 120km未満の運転の場合は、活動タイプごとのルールに従う
+        if (isShortDistanceDestination(destId)) {
             if (activityId === 'C') {
                 return 3400
             }

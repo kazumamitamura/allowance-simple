@@ -6,7 +6,7 @@ import { handleSupabaseError, logSupabaseError } from '@/utils/supabase/errorHan
 import { useRouter } from 'next/navigation'
 import Calendar from 'react-calendar'
 import 'react-calendar/dist/Calendar.css'
-import { ACTIVITY_TYPES, DESTINATIONS, calculateAmount, calculateAmountFromMaster, canSelectActivity } from '@/utils/allowanceRules'
+import { ACTIVITY_TYPES, DESTINATIONS, calculateAmount, calculateAmountFromMaster, canSelectActivity, mapLegacyDestinationId, isLongDistanceDestination } from '@/utils/allowanceRules'
 import { isAdmin as checkIsAdminRole } from '@/utils/adminRoles'
 import { logout } from './auth/actions'
 
@@ -150,7 +150,7 @@ export default function Home() {
   const [inputFirstName, setInputFirstName] = useState('')
 
   const [activityId, setActivityId] = useState('')
-  const [destinationId, setDestinationId] = useState('inside_short')
+  const [destinationId, setDestinationId] = useState('inside_shonai_mogami')
   const [destinationDetail, setDestinationDetail] = useState('') // 目的地（運転時）
   const [competitionName, setCompetitionName] = useState('') // 大会名（指定大会時）
   const [isDriving, setIsDriving] = useState(false)
@@ -573,17 +573,10 @@ export default function Home() {
       if (allowance) {
         setActivityId(allowance.activity_type === allowance.activity_type ? (ACTIVITY_TYPES.find(t => t.label === allowance.activity_type)?.id || allowance.activity_type) : '')
         
-        // 古いIDを新しいIDにマッピング（後方互換性）
-        let mappedDestinationId = DESTINATIONS.find(d => d.label === (allowance.destination_type || ''))?.id || 'inside_short'
-        const idMapping: Record<string, string> = {
-          'kannai': 'inside_short',
-          'kennai_short': 'inside_short',
-          'kennai_long': 'inside_long',
-          'kengai': 'outside'
-        }
-        if (idMapping[mappedDestinationId]) {
-          mappedDestinationId = idMapping[mappedDestinationId]
-        }
+        // 古いID・ラベルを新IDにマッピング（後方互換性）
+        const mappedDestinationId = mapLegacyDestinationId(
+          allowance.destination_type || ''
+        )
         
         setDestinationId(mappedDestinationId)
         
@@ -611,7 +604,7 @@ export default function Home() {
         setCustomDescription(allowance.custom_description || '')
       } else {
         setActivityId('')
-        setDestinationId('inside_short')
+        setDestinationId('inside_shonai_mogami')
         setDestinationDetail('')
         setCompetitionName('')
         setIsDriving(false)
@@ -1322,7 +1315,7 @@ export default function Home() {
                             return
                         }
                         setActivityId(newActivityId)
-                        setDestinationId('inside_short')
+                        setDestinationId('inside_shonai_mogami')
                     }} 
                     className="w-full bg-slate-50 p-3 sm:p-3 rounded-lg border-2 border-slate-300 font-bold text-black text-base appearance-none touch-manipulation"
                     style={{ fontSize: '16px' }}
@@ -1433,8 +1426,8 @@ export default function Home() {
                             )}
                         </div>
                         
-                        {/* 指定大会 + 運転あり + (県内120km以上 or 県外) の場合は目的地も入力 */}
-                        {activityId === 'C' && isDriving && (destinationId === 'inside_long' || destinationId === 'outside') && (
+                        {/* 指定大会 + 運転あり + 長距離区分 の場合は目的地も入力 */}
+                        {activityId === 'C' && isDriving && isLongDistanceDestination(destinationId) && (
                             <div>
                                 <label className="block text-xs font-bold text-green-700 mb-1">目的地（運転先） 🚗</label>
                                 <input 
@@ -1445,12 +1438,12 @@ export default function Home() {
                                     onChange={(e) => setDestinationDetail(e.target.value)} 
                                     className="w-full bg-green-50 p-3 rounded-lg border-2 border-green-300 text-xs text-black font-bold" 
                                 />
-                                <div className="text-xs text-green-600 mt-1">※県内120km以上または県外の運転先を入力してください</div>
+                                <div className="text-xs text-green-600 mt-1">※120㎞～500㎞未満または500㎞以上の運転先を入力してください</div>
                             </div>
                         )}
                         
-                        {/* 指定大会以外 + 運転あり + (県内120km以上 or 県外) の場合は目的地入力を表示 */}
-                        {activityId !== 'C' && isDriving && (destinationId === 'inside_long' || destinationId === 'outside') && (
+                        {/* 指定大会以外 + 運転あり + 長距離区分 の場合は目的地入力を表示 */}
+                        {activityId !== 'C' && isDriving && isLongDistanceDestination(destinationId) && (
                             <div>
                                 <label className="block text-xs font-bold text-green-700 mb-1">目的地（運転先） 🚗</label>
                                 <input 
@@ -1461,7 +1454,7 @@ export default function Home() {
                                     onChange={(e) => setDestinationDetail(e.target.value)} 
                                     className="w-full bg-green-50 p-3 rounded-lg border-2 border-green-300 text-xs text-black font-bold" 
                                 />
-                                <div className="text-xs text-green-600 mt-1">※県内120km以上または県外の運転先を入力してください</div>
+                                <div className="text-xs text-green-600 mt-1">※120㎞～500㎞未満または500㎞以上の運転先を入力してください</div>
                             </div>
                         )}
                     </div>
@@ -1529,31 +1522,33 @@ export default function Home() {
                                 const longBreakNote = isLongBreak && isWorkDay ? '（長期休業）' : ''
                                 
                                 if (isDriving) {
-                                    if (destinationId === 'outside') {
+                                    const destId = mapLegacyDestinationId(destinationId)
+                                    if (destId === 'distance_500_plus') {
                                         if (activityId === 'E') {
                                             const amt = effectiveWorkDay ? 15000 - 2400 : 15000
-                                            return `【運転】県外${longBreakNote}: ${amt.toLocaleString()}円`
+                                            return `【運転】500㎞以上${longBreakNote}: ${amt.toLocaleString()}円`
                                         }
                                         const baseAmount = 15000
                                         const total = isAccommodation && (activityId === 'E' || activityId === 'F') ? baseAmount + 2400 : baseAmount
-                                        return `【運転】県外: ${total.toLocaleString()}円${isAccommodation ? ' (運転15,000円＋宿泊2,400円)' : ''}`
+                                        return `【運転】500㎞以上: ${total.toLocaleString()}円${isAccommodation ? ' (運転15,000円＋宿泊2,400円)' : ''}`
                                     }
-                                    if (destinationId === 'inside_long') {
+                                    if (destId === 'distance_120_500') {
                                         if (activityId === 'E') {
                                             const amt = effectiveWorkDay ? 7500 - 2400 : 7500
-                                            return `【運転】県内120km以上${longBreakNote}: ${amt.toLocaleString()}円`
+                                            return `【運転】120㎞～500㎞未満${longBreakNote}: ${amt.toLocaleString()}円`
                                         }
                                         const baseAmount = 7500
                                         const total = isAccommodation && (activityId === 'E' || activityId === 'F') ? baseAmount + 2400 : baseAmount
-                                        return `【運転】県内120km以上: ${total.toLocaleString()}円${isAccommodation ? ' (運転7,500円＋宿泊2,400円)' : ''}`
+                                        return `【運転】120㎞～500㎞未満: ${total.toLocaleString()}円${isAccommodation ? ' (運転7,500円＋宿泊2,400円)' : ''}`
                                     }
-                                    if (destinationId === 'inside_short' || destinationId === 'school') {
-                                        if (activityId === 'C') return '【運転】指定大会（管内）: 3,400円'
+                                    if (destId === 'inside_shonai_mogami' || destId === 'inside_murayama_okitama') {
+                                        const regionLabel = destId === 'inside_shonai_mogami' ? '庄内・最上' : '村山・置賜'
+                                        if (activityId === 'C') return `【運転】指定大会（120km未満・${regionLabel}）: 3,400円`
                                         if (activityId === 'E' || activityId === 'F') {
                                             if (effectiveWorkDay) {
-                                                return isAccommodation ? '【運転】勤務日（管内＋宿泊）: 7,500円' : '【運転】勤務日（管内）: 5,100円'
+                                                return isAccommodation ? `【運転】勤務日（120km未満・${regionLabel}＋宿泊）: 7,500円` : `【運転】勤務日（120km未満・${regionLabel}）: 5,100円`
                                             }
-                                            return `【運転】休日${longBreakNote}（管内）: 2,400円`
+                                            return `【運転】休日${longBreakNote}（120km未満・${regionLabel}）: 2,400円`
                                         }
                                     }
                                 }
